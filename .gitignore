@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# exceção: modelo de variáveis
+!.env.example
+
+# testes
+/test-results/
+/playwright-report/
