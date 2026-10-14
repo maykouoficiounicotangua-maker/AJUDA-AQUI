@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Share } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/display";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { needsIOSInstall } from "@/lib/push/client";
 
 const DISMISS_KEY = "aa:push-prompt-dismissed";
 
@@ -27,6 +28,23 @@ export function PushPrompt() {
     setDismissed(readDismissed());
   }, []);
 
+  if (push.ready && !push.supported && !dismissed && needsIOSInstall()) {
+    return (
+      <Card className="border-brand-200 bg-brand-50">
+        <div className="flex items-start gap-3">
+          <Share className="mt-1 size-6 shrink-0 text-brand-700" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold">Receba avisos no iPhone</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Toque em <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong>. Abra o Ajuda Aqui pelo ícone
+              criado e ative as notificações.
+            </p>
+            <Button variant="ghost" size="sm" className="mt-2" onClick={onDismiss}>Entendi</Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
   if (!push.ready || !push.supported || !push.configured || push.subscribed || push.permission === "denied" || dismissed) return null;
 
   async function onEnable() {

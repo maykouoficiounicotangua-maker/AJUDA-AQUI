@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/form";
 import { useRunAction } from "@/hooks/useRunAction";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { updateNotificationPrefsAction, updatePrivacyAction } from "@/app/actions/profile";
+import { deleteAccountAction, updateNotificationPrefsAction, updatePrivacyAction } from "@/app/actions/profile";
 import { unblockUserAction } from "@/app/actions/social";
 import { PREFERENCE_LABELS } from "@/lib/notifications/catalog";
 import type { NotificationPrefs } from "@/services/notifications";
@@ -84,6 +84,36 @@ export function NotificationSettings({ initial }: { initial: NotificationPrefs }
           onChange={(c) => update({ [l.column]: c } as Partial<NotificationPrefs>)}
         />
       ))}
+    </Card>
+  );
+}
+
+export function DeleteAccount() {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const { run, pending } = useRunAction();
+  if (!open) {
+    return <Button variant="dangerOutline" onClick={() => setOpen(true)}>Excluir minha conta</Button>;
+  }
+  return (
+    <Card className="space-y-3 border-danger-600/40 bg-danger-50">
+      <p className="font-bold">Excluir sua conta é definitivo.</p>
+      <ul className="list-disc space-y-1 pl-5 text-sm">
+        <li>Seu perfil, pedidos, propostas, avaliações e notificações serão apagados.</li>
+        <li>Ajudas em andamento com você serão canceladas e a outra pessoa será avisada.</li>
+        <li>Mensagens que você enviou ficam anônimas na conversa da outra pessoa.</li>
+      </ul>
+      <label htmlFor="confirm-delete" className="block text-sm font-semibold">Digite EXCLUIR para confirmar</label>
+      <input
+        id="confirm-delete" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off"
+        className="min-h-12 w-full rounded-2xl border border-line bg-white px-4"
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => { setOpen(false); setText(""); }} disabled={pending}>Cancelar</Button>
+        <Button variant="danger" loading={pending} disabled={text.trim().toUpperCase() !== "EXCLUIR"} onClick={() => run(() => deleteAccountAction(text), { refresh: false })}>
+          Excluir definitivamente
+        </Button>
+      </div>
     </Card>
   );
 }

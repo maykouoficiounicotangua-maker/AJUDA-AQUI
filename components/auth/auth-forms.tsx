@@ -13,6 +13,11 @@ import { forgotPasswordAction, resetPasswordAction, signInAction, signUpAction }
 import { forgotPasswordSchema, resetPasswordSchema, signInSchema, signUpSchema } from "@/lib/validations";
 import type { ActionResult } from "@/types";
 
+/*
+ * method="post" em todos os formulários: se o usuário enviar antes do JavaScript carregar,
+ * o navegador NUNCA coloca e-mail/senha na URL (histórico, logs de servidor/proxy).
+ */
+
 /** Estado de envio compartilhado pelos formulários (o formulário tipado é criado em cada componente). */
 function useSubmit<TValues extends FieldValues>(form: UseFormReturn<TValues>) {
   const [pending, start] = useTransition();
@@ -47,7 +52,7 @@ export function SignInForm({ next }: { next?: string }) {
   const { pending, result, submit } = useSubmit(form);
   const { register, formState: { errors } } = form;
   return (
-    <form onSubmit={submit((v) => signInAction(v, next))} className="space-y-4" noValidate>
+    <form method="post" onSubmit={submit((v) => signInAction(v, next))} className="space-y-4" noValidate>
       <Field label="E-mail" error={errors.email?.message} required>
         {(a) => <Input {...a} type="email" autoComplete="email" inputMode="email" {...register("email")} />}
       </Field>
@@ -77,7 +82,7 @@ export function SignUpForm() {
     );
   }
   return (
-    <form onSubmit={submit(signUpAction)} className="space-y-4" noValidate>
+    <form method="post" onSubmit={submit(signUpAction)} className="space-y-4" noValidate>
       <Field label="Nome completo" error={errors.fullName?.message} required>
         {(a) => <Input {...a} autoComplete="name" {...register("fullName")} />}
       </Field>
@@ -114,7 +119,7 @@ export function ForgotPasswordForm() {
   const { register, formState: { errors } } = form;
   if (result?.ok) return <Notice tone="success">{result.message}</Notice>;
   return (
-    <form onSubmit={submit(forgotPasswordAction)} className="space-y-4" noValidate>
+    <form method="post" onSubmit={submit(forgotPasswordAction)} className="space-y-4" noValidate>
       <Field label="E-mail da sua conta" error={errors.email?.message} required>
         {(a) => <Input {...a} type="email" autoComplete="email" inputMode="email" {...register("email")} />}
       </Field>
@@ -129,7 +134,7 @@ export function ResetPasswordForm() {
   const { pending, result, submit } = useSubmit(form);
   const { register, formState: { errors } } = form;
   return (
-    <form onSubmit={submit(resetPasswordAction)} className="space-y-4" noValidate>
+    <form method="post" onSubmit={submit(resetPasswordAction)} className="space-y-4" noValidate>
       <Field label="Nova senha" error={errors.password?.message} required hint="Mínimo de 8 caracteres, com letras e números.">
         {(a) => <Input {...a} type="password" autoComplete="new-password" {...register("password")} />}
       </Field>

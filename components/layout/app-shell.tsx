@@ -41,7 +41,8 @@ export function AppShell({
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-white/90 px-4 py-2 backdrop-blur lg:justify-end">
           <div className="lg:hidden"><Logo href="/inicio" /></div>
           <div className="flex items-center gap-1">
-            <NotificationBell userId={profile.id} initialUnread={unreadNotifications} />
+            {/* key: quando o servidor recalcula o total (ex.: após "marcar tudo como lido"), o contador reinicia */}
+            <NotificationBell key={unreadNotifications} userId={profile.id} initialUnread={unreadNotifications} />
             <Link href="/perfil" aria-label="Meu perfil" className="rounded-full">
               <Avatar name={profile.full_name} src={profile.avatar_url} size={40} />
             </Link>

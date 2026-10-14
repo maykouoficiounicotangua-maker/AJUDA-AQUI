@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { Card } from "@/components/ui/display";
+import { Ban } from "lucide-react";
+import { Card, EmptyState } from "@/components/ui/display";
 import { FavoriteButton } from "@/components/requests/favorite-button";
 import { ProfileView } from "@/components/profile/profile-view";
 import { UserSafety } from "@/components/profile/user-safety";
@@ -8,7 +9,7 @@ import { getSupabase, requireUser } from "@/lib/auth/session";
 import { uuid } from "@/lib/validations";
 import { listCategories } from "@/services/categories";
 import { getHelperPrefs, getProfile, getProfilesByIds, getStatsByIds, getUserCategoryIds, listReviewsReceived } from "@/services/profiles";
-import { isBlockedByMe, listFavoriteIds } from "@/services/social";
+import { isBlockedByMe, listFavoriteIds, listMyBlocks } from "@/services/social";
 
 export const metadata: Metadata = { title: "Perfil", robots: { index: false, follow: false } };
 
@@ -20,7 +21,23 @@ export default async function PublicProfilePage({ params }: PageProps<"/usuario/
   const db = await getSupabase();
 
   const profile = await getProfile(db, id);
-  if (!profile) notFound(); // inexistente, privado ou bloqueado: mesma resposta
+  if (!profile) {
+    // Quem EU bloqueei some da RLS de perfis; ainda preciso conseguir desbloquear daqui.
+    const mine = (await listMyBlocks(db)).find((b) => b.id === id);
+    if (!mine) notFound(); // inexistente, privado ou que me bloqueou: mesma resposta
+    return (
+      <div className="mx-auto max-w-2xl space-y-5">
+        <EmptyState
+          icon={<Ban className="size-10" aria-hidden />}
+          title={`Você bloqueou ${mine.name.split(" ")[0]}`}
+          description="Vocês não podem trocar mensagens, enviar propostas nem ver os pedidos um do outro."
+        />
+        <Card>
+          <UserSafety userId={id} userName={mine.name.split(" ")[0]} blocked />
+        </Card>
+      </div>
+    );
+  }
 
   const [stats, categoryIds, allCategories, prefs, reviews, blocked, favs] = await Promise.all([
     getStatsByIds(db, [id]), getUserCategoryIds(db, id), listCategories(db, { includeInactive: true }),

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { HandHelping, MapPin, MessagesSquare, ShieldCheck, Star } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { LinkButton } from "@/components/ui/button";
+import { Notice } from "@/components/ui/display";
 import { getAuthUser } from "@/lib/auth/session";
 import { isSupabaseConfigured } from "@/lib/env";
 
@@ -17,8 +18,10 @@ const steps = [
   { icon: Star, title: "Avalie", text: "Depois da ajuda, os dois se avaliam e a confiança cresce na comunidade." },
 ];
 
-export default async function LandingPage() {
-  if (isSupabaseConfigured() && (await getAuthUser())) redirect("/inicio");
+export default async function LandingPage({ searchParams }: PageProps<"/">) {
+  const sp = await searchParams;
+  const accountDeleted = sp.conta === "excluida";
+  if (!accountDeleted && isSupabaseConfigured() && (await getAuthUser())) redirect("/inicio");
 
   return (
     <>
@@ -31,6 +34,11 @@ export default async function LandingPage() {
       </header>
 
       <main id="conteudo" className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16">
+        {accountDeleted && (
+          <div className="mt-4">
+            <Notice tone="success" title="Sua conta foi excluída">Seus dados foram removidos. Obrigado por ter feito parte do Ajuda Aqui.</Notice>
+          </div>
+        )}
         <section className="py-10 text-center sm:py-16">
           <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-brand-100 px-3 py-1 text-sm font-semibold text-brand-800">
             <MapPin className="size-4" aria-hidden /> Perto de você, em todo o Brasil

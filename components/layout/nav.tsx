@@ -40,7 +40,7 @@ export function BottomNav({ unreadMessages }: { unreadMessages: number }) {
                 )}
               >
                 {primary ? (
-                  <span className="-mt-6 grid size-14 place-items-center rounded-full bg-warm-600 text-white shadow-lg">
+                  <span className="-mt-6 grid size-14 place-items-center rounded-full bg-warm-700 text-white shadow-lg">
                     <Icon className="size-7" aria-hidden />
                   </span>
                 ) : (
@@ -83,7 +83,7 @@ export function SideNav({ unreadMessages, isAdmin }: { unreadMessages: number; i
             className={cn(
               "flex min-h-12 items-center gap-3 rounded-2xl px-4 font-semibold",
               primary
-                ? "mb-2 bg-warm-600 text-white hover:bg-warm-700"
+                ? "mb-2 bg-warm-700 text-white hover:bg-orange-800"
                 : active
                   ? "bg-brand-50 text-brand-800"
                   : "text-ink-muted hover:bg-slate-100",

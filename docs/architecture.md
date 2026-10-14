@@ -30,6 +30,10 @@ UI (app/, components/)  →  Server Actions / Route Handlers  →  services/  �
 | 16 | Testes de RLS/RPC com PGlite aplicando as migrations reais | Roda em qualquer máquina/CI sem Docker; negativos e positivos de segurança de verdade |
 | 17 | Route Handlers usam `getRouteUser()` | Sem Supabase configurado respondem 401, nunca 500 com stack trace |
 | 18 | Exclusão de conta resolvida no banco (`profiles_before_delete`, `ON DELETE SET NULL`) | Descoberto pelo teste de idempotência do seed: sem isso nenhuma conta que já foi ajudante podia ser excluída (LGPD) |
+| 20 | Formulários com `method="post"` | Envio antes da hidratação nunca coloca senha na URL |
+| 21 | E2E autoprovisionado (`tests/e2e/support/live.ts`) | Roda contra o Supabase real/produção sem seed e sem enviar e-mails; limpa tudo ao final |
+| 22 | Fan-out de matching em `after()` | Publicar responde rápido; só a contagem é calculada antes |
+| 23 | `/auth/confirm` (token_hash) além de `/auth/callback` (PKCE) | Confirmação de e-mail funciona em outro aparelho |
 | 19 | Coordenada pública = centróide da cidade (`lib/geo/locations.ts`) | Sem API externa de geocoding; privacidade por construção. Substituir por tabela IBGE para cobertura nacional completa |
 
 ## Máquina de estados do pedido
@@ -42,4 +46,5 @@ Atualize esta seção a cada fase concluída.
 - Fase 0: projeto vazio; scaffold Next 16 + Tailwind 4.
 - Fases 1–19 e 21–23: implementadas (docs, design system, migrations+RLS, auth/consent/onboarding, categorias, pedidos+wizard, explorar, propostas, matching, seleção/confirmação, chat realtime, conclusão/disputa, avaliações/reputação, notificações+push VAPID, bloqueio/denúncia, admin+auditoria, analytics, PWA, segurança, deploy).
 - Fase 20 (E2E): específicos públicos rodam; fluxos completos escritos e protegidos por `E2E_FULL=1` (exigem Supabase real).
+- 2026-10-15: verificação contra produção (fluxos completos passando com Supabase real); correções e melhorias listadas no commit.
 - **Pendências conhecidas**: (a) rodar E2E completo contra Supabase real; (b) validar entrega de push em navegador real com chaves VAPID; (c) tabela IBGE de municípios/centróides; (d) prompt de Push chegou truncado na seção 23 — integração matching→push implementada em `lib/notifications/match-fanout.ts`.

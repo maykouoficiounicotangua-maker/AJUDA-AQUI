@@ -47,6 +47,15 @@ test.describe("páginas públicas", () => {
     await expect(page.getByRole("link", { name: "Esqueci minha senha" })).toBeVisible();
   });
 
+  test("formulários de credenciais nunca usam GET (senha não pode ir para a URL)", async ({ page }) => {
+    for (const path of ["/entrar", "/cadastrar", "/recuperar-senha"]) {
+      await page.goto(path);
+      const methods = await page.locator("form").evaluateAll((fs) => fs.map((f) => (f as HTMLFormElement).method));
+      expect(methods.length, path).toBeGreaterThan(0);
+      for (const m of methods) expect(m, path).toBe("post");
+    }
+  });
+
   test("recuperar senha é acessível", async ({ page }) => {
     await page.goto("/recuperar-senha");
     await expect(page.getByRole("heading", { name: "Recuperar senha" })).toBeVisible();

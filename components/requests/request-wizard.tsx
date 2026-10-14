@@ -34,6 +34,14 @@ const HELP_TYPES = [
 
 const DURATIONS = [15, 30, 60, 90, 120, 180, 240];
 
+/** Hoje às 18h se ainda der tempo; senão amanhã às 18h (evita começar o formulário com data já passada). */
+function defaultSchedule() {
+  const now = nowInTimezone();
+  if (now.time < "17:00") return { scheduledDate: now.date, scheduledTime: "18:00" };
+  const [y, m, d] = now.date.split("-").map(Number);
+  return { scheduledDate: toLocalISODate(new Date(y, m - 1, d + 1)), scheduledTime: "18:00" };
+}
+
 export function RequestWizard({
   categories,
   initial,
@@ -59,7 +67,7 @@ export function RequestWizard({
     resolver: zodResolver(requestInputSchema as never) as never,
     mode: "onTouched",
     defaultValues: {
-      categoryId: "", title: "", description: "", scheduledDate: nowInTimezone().date, scheduledTime: "18:00",
+      categoryId: "", title: "", description: "", ...defaultSchedule(),
       durationMinutes: 60, state: defaults.state, city: defaults.city, neighborhood: defaults.neighborhood,
       address: "", helpType: "FREE", exchangeDescription: "", ...initial,
     },
@@ -163,13 +171,13 @@ export function RequestWizard({
         )}
         <div className="flex-1">
           <p className="text-sm font-semibold text-ink-muted" aria-live="polite">Etapa {step + 1} de 7</p>
-          <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuemin={1} aria-valuemax={7} aria-valuenow={step + 1}>
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Progresso do pedido" aria-valuemin={1} aria-valuemax={7} aria-valuenow={step + 1}>
             <div className="h-full rounded-full bg-brand-700 transition-all" style={{ width: `${((step + 1) / 7) * 100}%` }} />
           </div>
         </div>
       </div>
 
-      <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-5">
+      <form method="post" onSubmit={(e) => e.preventDefault()} noValidate className="space-y-5">
         <h1 className="text-2xl font-extrabold">{STEP_TITLES[step]}</h1>
 
         {step === 0 && (
@@ -283,7 +291,8 @@ export function RequestWizard({
           </Card>
         )}
 
-        <div className="flex flex-col gap-3 pt-2">
+        {/* Barra de ação sempre visível (acima da navegação inferior no celular) */}
+        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-10 -mx-4 flex flex-col gap-3 border-t border-line bg-canvas/95 px-4 pt-3 pb-3 backdrop-blur lg:bottom-0 lg:mx-0 lg:px-0">
           {step < 5 && <Button size="lg" onClick={next}>Continuar</Button>}
           {step === 5 && (
             <>

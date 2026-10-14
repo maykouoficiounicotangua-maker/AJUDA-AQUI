@@ -5,7 +5,7 @@
 export const NOTIFICATION_TYPES = [
   "NEW_MATCH", "NEW_HELP_REQUEST", "NEW_OFFER", "OFFER_ACCEPTED", "OFFER_REJECTED", "NEW_MESSAGE",
   "REQUEST_ASSIGNED", "REQUEST_STARTED", "REQUEST_COMPLETION_PENDING", "REQUEST_COMPLETED",
-  "REQUEST_CANCELLED", "NEW_REVIEW", "REPORT_CREATED", "REPORT_UPDATED", "DISPUTE_OPENED", "SYSTEM_ALERT",
+  "REQUEST_CANCELLED", "REQUEST_REMINDER", "NEW_REVIEW", "REPORT_CREATED", "REPORT_UPDATED", "DISPUTE_OPENED", "SYSTEM_ALERT",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -27,6 +27,7 @@ export function preferenceGroup(type: NotificationType): PreferenceGroup {
     case "REQUEST_COMPLETION_PENDING":
     case "REQUEST_COMPLETED":
     case "REQUEST_CANCELLED":
+    case "REQUEST_REMINDER":
       return "requests";
     case "NEW_REVIEW":
       return "reviews";

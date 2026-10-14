@@ -7,6 +7,15 @@ export function isPushSupported(): boolean {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }
 
+/** iPhone/iPad só recebem Web Push com o app instalado na Tela de Início (iOS 16.4+). */
+export function needsIOSInstall(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
+  return isIOS && !standalone;
+}
+
 export function getNotificationPermission(): PushPermission {
   return isPushSupported() ? Notification.permission : "unsupported";
 }

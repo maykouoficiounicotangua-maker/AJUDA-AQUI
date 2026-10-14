@@ -28,9 +28,11 @@ export function ExploreFilters({ categories, defaultState }: { categories: Categ
   const [pending, start] = useTransition();
   const [q, setQ] = useState(params.get("q") ?? "");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   function update(patch: Record<string, string>) {
     const next = new URLSearchParams(params.toString());
+    if (!("q" in patch)) patch = { ...patch, q };
     for (const [k, v] of Object.entries(patch)) {
       if (v) next.set(k, v);
       else next.delete(k);
@@ -43,7 +45,10 @@ export function ExploreFilters({ categories, defaultState }: { categories: Categ
   useEffect(() => {
     if (q === (params.get("q") ?? "")) return;
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => update({ q }), 400);
+    // Só aplica se o usuário AINDA está na busca: se ele já tocou num pedido, não o arrastamos de volta.
+    timer.current = setTimeout(() => {
+      if (document.activeElement === searchRef.current) update({ q });
+    }, 400);
     return () => clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
@@ -70,7 +75,9 @@ export function ExploreFilters({ categories, defaultState }: { categories: Categ
     <section aria-label="Filtros" className="space-y-3" aria-busy={pending}>
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-slate-400" aria-hidden />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por palavra…" className="pl-12" aria-label="Buscar pedidos" maxLength={80} />
+        <Input
+          ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { clearTimeout(timer.current); update({ q }); } }} placeholder="Buscar por palavra…" className="pl-12" aria-label="Buscar pedidos" maxLength={80} />
       </div>
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Quando">
@@ -83,7 +90,7 @@ export function ExploreFilters({ categories, defaultState }: { categories: Categ
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <Select aria-label="Categoria" value={params.get("categoria") ?? ""} onChange={(e) => update({ categoria: e.target.value })}>
           <option value="">Todas as categorias</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -96,6 +103,11 @@ export function ExploreFilters({ categories, defaultState }: { categories: Categ
           aria-label="Cidade" placeholder="Cidade" defaultValue={params.get("cidade") ?? ""} key={`c-${params.get("cidade") ?? ""}`}
           onBlur={(e) => e.target.value !== (params.get("cidade") ?? "") && update({ cidade: e.target.value.trim() })}
           onKeyDown={(e) => e.key === "Enter" && update({ cidade: e.currentTarget.value.trim() })}
+        />
+        <Input
+          aria-label="Bairro ou região" placeholder="Bairro" defaultValue={params.get("bairro") ?? ""} key={`b-${params.get("bairro") ?? ""}`}
+          onBlur={(e) => e.target.value !== (params.get("bairro") ?? "") && update({ bairro: e.target.value.trim() })}
+          onKeyDown={(e) => e.key === "Enter" && update({ bairro: e.currentTarget.value.trim() })}
         />
         <Select aria-label="Distância" value={params.get("km") ?? ""} onChange={(e) => update({ km: e.target.value })}>
           <option value="">Qualquer distância</option>

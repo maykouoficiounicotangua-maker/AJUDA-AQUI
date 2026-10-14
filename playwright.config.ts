@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
+// E2E_BASE_URL aponta para um ambiente já publicado (ex.: Vercel) e dispensa o servidor local
+const REMOTE = process.env.E2E_BASE_URL;
 
 /**
  * E2E. Duas camadas:
@@ -15,13 +17,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: REMOTE ?? `http://localhost:${PORT}`,
     trace: "retain-on-failure",
     locale: "pt-BR",
     timezoneId: "America/Sao_Paulo",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
+  webServer: REMOTE ? undefined : {
     command: `npx next build && npx next start -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,

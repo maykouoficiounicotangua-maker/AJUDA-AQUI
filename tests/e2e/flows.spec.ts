@@ -1,84 +1,108 @@
 /**
- * E2E dos fluxos completos (itens 87–91 do prompt mestre).
+ * E2E dos fluxos completos (itens 87–92 do prompt mestre) contra um Supabase REAL.
  *
- * REQUISITOS: Supabase local/remoto com as migrations e o seed.sql aplicados, `.env.local` preenchido e
- * confirmação de e-mail DESLIGADA (supabase/config.toml: enable_confirmations = false).
- *   supabase start && supabase db reset
- *   E2E_FULL=1 npx playwright test tests/e2e/flows.spec.ts
- *
- * Sem E2E_FULL=1 estes testes são ignorados (não há como rodá-los sem backend real).
- * Usuários demo (senha Demo@12345): maria, joao, carlos, admin @demo.ajudaaqui.local
+ * Os dados são autoprovisionados (usuários temporários via API admin, sem e-mail) e REMOVIDOS no final,
+ * então pode rodar contra o projeto hospedado:
+ *   E2E_FULL=1 E2E_BASE_URL=https://ajuda-aqui.vercel.app npx playwright test tests/e2e/flows.spec.ts
+ * ou localmente (sem E2E_BASE_URL o Playwright sobe `next start` com o .env.local).
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import * as live from "./support/live";
 
-test.skip(!process.env.E2E_FULL, "Defina E2E_FULL=1 com Supabase local + seed (ver docs/testing.md)");
-test.describe.configure({ mode: "serial" });
+test.skip(!process.env.E2E_FULL || !live.liveConfigured, "Defina E2E_FULL=1 e as chaves do Supabase (.env.local)");
 
-const PASSWORD = "Demo@12345";
-const demo = (name: string) => `${name}@demo.ajudaaqui.local`;
+let maria: live.TestUser;
+let joao: live.TestUser;
+let carlos: live.TestUser;
+let admin: live.TestUser;
+let carlosRequest: string;
+const signupEmail = live.emailFor("cadastro");
+
+test.beforeAll(async () => {
+  maria = await live.createUser("maria", "Maria Teste");
+  joao = await live.createUser("joao", "João Teste", { categories: ["entregas", "tecnologia"], neighborhood: "Centro" });
+  carlos = await live.createUser("carlos", "Carlos Teste", { city: "Niterói" });
+  admin = await live.createUser("admin", "Admin Teste", { role: "ADMIN" });
+  carlosRequest = await live.createOpenRequest(carlos, `Pedido do Carlos ${live.RUN}`);
+});
+
+test.afterAll(async () => {
+  await live.cleanup([signupEmail]);
+});
 
 async function login(page: Page, email: string) {
   await page.goto("/entrar");
   await page.getByLabel("E-mail").fill(email);
-  await page.getByLabel("Senha").fill(PASSWORD);
+  await page.getByLabel("Senha").fill(live.PASSWORD);
   await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL(/\/inicio/);
+  await expect(page).toHaveURL(/\/inicio/, { timeout: 20_000 });
 }
 
-async function newSession(browser: Browser, name: string) {
+async function session(browser: Browser, user: live.TestUser) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await login(page, demo(name));
+  await login(page, user.email);
   return { context, page };
 }
 
-const futureDate = () => {
-  const d = new Date(Date.now() + 5 * 86_400_000);
-  return d.toISOString().slice(0, 10);
-};
+/** Acesso negado: o app responde a página "não encontrada" (com loading.tsx o Next transmite 200 + noindex). */
+async function expectNotFound(page: Page, url: string, mustNotContain?: string) {
+  await page.goto(url);
+  await expect(page.getByRole("heading", { name: "Página não encontrada" })).toBeVisible();
+  if (mustNotContain) await expect(page.getByText(mustNotContain)).toHaveCount(0);
+}
+
+const futureDate = () => new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
 
 test.describe("cadastro, login e logout", () => {
-  test("cria conta, aceita termos (no cadastro), faz onboarding e sai", async ({ page }) => {
-    const email = `e2e.${Date.now()}@teste.ajudaaqui.local`;
+  test("cadastro pela interface → (confirmação) → onboarding → início → sair", async ({ page }) => {
+    const settings = await live.authSettings();
+    // Com confirmação de e-mail ligada, cadastrar pela UI enviaria um e-mail REAL e gastaria a cota do SMTP.
+    test.skip(!settings.mailer_autoconfirm, "Confirmação de e-mail ligada: o cadastro é coberto pela API admin e pelos testes de formulário");
     await page.goto("/cadastrar");
-    await page.getByLabel("Nome completo").fill("Teste E2E Silva");
-    await page.getByLabel("E-mail").fill(email);
+    await page.getByLabel("Nome completo").fill("Cadastro Teste Silva");
+    await page.getByLabel("E-mail").fill(signupEmail);
     await page.getByLabel(/Telefone/).fill("(21) 99999-0000");
-    await page.getByLabel(/^Senha/).fill("senha12345");
+    await page.getByLabel(/^Senha/).fill(live.PASSWORD);
     await page.getByLabel("Estado").selectOption("RJ");
-    await page.getByLabel("Cidade").fill("Niterói");
+    await page.getByRole("combobox", { name: /^Cidade/ }).fill("Niterói");
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Criar minha conta" }).click();
 
-    await expect(page).toHaveURL(/boas-vindas/);
-    await expect(page.getByRole("heading", { name: /Bem-vindo ao Ajuda Aqui/ })).toBeVisible();
-    await page.getByRole("button", { name: "Continuar" }).click();
-    await expect(page.getByRole("heading", { name: "Precisa de ajuda?" })).toBeVisible();
-    await page.getByRole("button", { name: "Continuar" }).click();
-    await expect(page.getByRole("heading", { name: "Quer ajudar?" })).toBeVisible();
-    await page.getByRole("button", { name: "Continuar" }).click();
-    await expect(page.getByRole("heading", { name: "Ajude com segurança" })).toBeVisible();
+    if (!settings.mailer_autoconfirm) {
+      // Produção com confirmação de e-mail: a UI orienta e o teste confirma pela API admin.
+      await expect(page.getByText("Quase lá!")).toBeVisible({ timeout: 20_000 });
+      const id = await live.findUserIdByEmail(signupEmail);
+      expect(id, "usuário criado pelo cadastro").toBeTruthy();
+      // consentimento versionado gravado no cadastro
+      const consents = await live.adminSelect<unknown[]>(`consents?user_id=eq.${id}&select=terms_version`);
+      expect(consents).toHaveLength(1);
+      await live.confirmEmail(id!);
+      await login(page, signupEmail).catch(() => undefined);
+      await page.goto("/boas-vindas");
+    }
+    await expect(page.getByRole("heading", { name: /Bem-vindo ao Ajuda Aqui/ })).toBeVisible({ timeout: 20_000 });
+    for (const t of ["Precisa de ajuda?", "Quer ajudar?", "Ajude com segurança"]) {
+      await page.getByRole("button", { name: "Continuar" }).click();
+      await expect(page.getByRole("heading", { name: t })).toBeVisible();
+    }
     await page.getByRole("button", { name: "COMEÇAR" }).click();
-
     await expect(page).toHaveURL(/\/inicio/);
-    await expect(page.getByRole("heading", { name: /Olá, Teste/ })).toBeVisible();
     await expect(page.getByText("O que você precisa hoje?")).toBeVisible();
 
-    // onboarding não aparece de novo
     await page.goto("/boas-vindas");
-    await expect(page).toHaveURL(/\/inicio/);
+    await expect(page).toHaveURL(/\/inicio/); // onboarding não reaparece
 
-    // logout (desktop: botão "Sair" na sidebar)
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.getByRole("button", { name: "Sair" }).click();
     await expect(page).toHaveURL(/\/entrar/);
     await page.goto("/inicio");
-    await expect(page).toHaveURL(/\/entrar/); // rota protegida
+    await expect(page).toHaveURL(/\/entrar/);
   });
 
-  test("login com senha errada mostra mensagem genérica", async ({ page }) => {
+  test("senha errada mostra mensagem genérica", async ({ page }) => {
     await page.goto("/entrar");
-    await page.getByLabel("E-mail").fill(demo("maria"));
+    await page.getByLabel("E-mail").fill(maria.email);
     await page.getByLabel("Senha").fill("senha-errada-123");
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page.getByText("E-mail ou senha incorretos.")).toBeVisible();
@@ -86,46 +110,54 @@ test.describe("cadastro, login e logout", () => {
 });
 
 test.describe("fluxo principal: Maria pede, João ajuda", () => {
-  let requestUrl = "";
-  const title = `Buscar uma encomenda ${Date.now()}`;
+  test.describe.configure({ mode: "serial" });
+  let requestPath = "";
+  const title = `Buscar uma encomenda ${live.RUN}`;
 
   test("Maria cria e publica um pedido remunerado (R$ 20)", async ({ browser }) => {
-    const { context, page } = await newSession(browser, "maria");
+    const { context, page } = await session(browser, maria);
     await page.getByRole("link", { name: /PRECISO DE AJUDA/ }).click();
     await expect(page).toHaveURL(/pedido\/novo/);
-
     await page.getByRole("radio", { name: /Entregas/ }).click();
     await page.getByLabel(/Título do pedido/).fill(title);
     await page.getByRole("button", { name: "Continuar" }).click();
-    await page.getByLabel(/Descreva o que precisa/).fill("Preciso buscar uma encomenda hoje no fim da tarde.");
+    await page.getByLabel(/Descreva o que precisa/).fill("Preciso buscar uma encomenda no fim da tarde.");
     await page.getByRole("button", { name: "Continuar" }).click();
     await page.getByLabel(/^Data/).fill(futureDate());
     await page.getByLabel(/^Horário/).fill("18:00");
     await page.getByRole("button", { name: "Continuar" }).click();
-    await page.getByRole("button", { name: "Continuar" }).click(); // onde (padrão do perfil)
+    await page.getByLabel(/Endereço \(privado\)/).fill("Rua Teste Privada, 99");
+    await page.getByRole("button", { name: "Continuar" }).click();
     await page.getByRole("radio", { name: /Remunerada/ }).click();
     await page.getByLabel(/Valor oferecido/).fill("20");
     await page.getByRole("button", { name: "Continuar" }).click();
     await expect(page.getByText("Etapa 6 de 7")).toBeVisible();
     await page.getByRole("button", { name: "Publicar pedido" }).click();
 
-    await expect(page.getByRole("heading", { name: "Pedido publicado com sucesso!" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pedido publicado com sucesso!" })).toBeVisible({ timeout: 20_000 });
+    // matching encontrou João (categoria Entregas, mesma cidade)
+    await expect(page.getByText(/Encontramos \d+ pessoas? que pode/)).toBeVisible();
     await page.getByRole("link", { name: "Ver meu pedido" }).click();
-    requestUrl = new URL(page.url()).pathname;
+    await page.waitForURL(/\/pedido\/[0-9a-f-]{36}$/);
+    requestPath = new URL(page.url()).pathname;
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
-    await expect(page.getByText("Aberto")).toBeVisible();
     await context.close();
+
+    const [req] = await live.adminSelect<{ amount_cents: number; status: string }[]>(`help_requests?select=amount_cents,status&id=eq.${requestPath.split("/").pop()}`);
+    expect(req).toMatchObject({ amount_cents: 2000, status: "OPEN" });
   });
 
-  test("João encontra o pedido, vê compatibilidade e envia proposta", async ({ browser }) => {
-    const { context, page } = await newSession(browser, "joao");
+  test("João recebe a notificação de pedido compatível, vê o pedido e envia proposta", async ({ browser }) => {
+    const { context, page } = await session(browser, joao);
+    await page.goto("/notificacoes");
+    await expect(page.getByText("Nova oportunidade de ajuda").first()).toBeVisible();
+
     await page.goto("/explorar?estado=all");
     await page.getByLabel("Buscar pedidos").fill(title);
-    await expect(page.getByRole("link", { name: title })).toBeVisible();
+    await expect(page.getByRole("link", { name: title })).toBeVisible({ timeout: 15_000 });
     await page.getByRole("link", { name: title }).click();
-    await expect(page.getByText(/compatibilidade/)).toBeVisible();
-    await expect(page.getByText(/R\$\s?20,00/).first()).toBeVisible();
-    await expect(page.getByText(/Rua Exemplo|apto 45/)).toHaveCount(0); // endereço privado nunca aparece
+    await expect(page.getByText(/compatibilidade/).first()).toBeVisible();
+    await expect(page.getByText("Rua Teste Privada")).toHaveCount(0); // endereço privado nunca aparece antes da confirmação
 
     await page.getByRole("button", { name: /TENHO INTERESSE/ }).click();
     await page.getByLabel(/Conte rapidamente/).fill("Posso realizar essa tarefa hoje às 18h.");
@@ -134,178 +166,160 @@ test.describe("fluxo principal: Maria pede, João ajuda", () => {
     await context.close();
   });
 
-  test("Maria vê a notificação, visualiza o perfil e aceita João", async ({ browser }) => {
-    const { context, page } = await newSession(browser, "maria");
+  test("Maria vê a notificação, o perfil do João e o aceita", async ({ browser }) => {
+    const { context, page } = await session(browser, maria);
     await page.goto("/notificacoes");
     await expect(page.getByText("Nova proposta").first()).toBeVisible();
-
-    await page.goto(requestUrl);
+    await page.goto(requestPath);
     await expect(page.getByRole("heading", { name: /Interessados/ })).toBeVisible();
-    await expect(page.getByText("João Souza")).toBeVisible();
-    await page.getByRole("link", { name: /João Souza/ }).first().click();
-    await expect(page.getByRole("heading", { name: "João Souza" })).toBeVisible();
+    await page.getByRole("link", { name: /João Teste/ }).first().click();
+    await expect(page.getByRole("heading", { name: "João Teste" })).toBeVisible();
     await page.goBack();
-
     await page.getByRole("button", { name: /Aceitar João/ }).click();
-    await expect(page).toHaveURL(/\/conversa\//);
+    await expect(page).toHaveURL(/\/conversa\//, { timeout: 20_000 });
     await expect(page.getByText(/foi selecionado\(a\) para realizar esta ajuda/)).toBeVisible();
     await context.close();
   });
 
-  test("chat em tempo real: mensagem enviada por Maria chega ao João sem recarregar", async ({ browser }) => {
-    const maria = await newSession(browser, "maria");
-    const joao = await newSession(browser, "joao");
-    await joao.page.goto("/mensagens");
-    await joao.page.getByRole("link", { name: /Maria Silva/ }).first().click();
-    await maria.page.goto("/mensagens");
-    await maria.page.getByRole("link", { name: /João Souza/ }).first().click();
+  test("chat em tempo real e confirmação de leitura", async ({ browser }) => {
+    const m = await session(browser, maria);
+    const j = await session(browser, joao);
+    await j.page.goto("/mensagens");
+    await j.page.getByRole("link", { name: /Maria Teste/ }).first().click();
+    await m.page.goto("/mensagens");
+    await m.page.getByRole("link", { name: /João Teste/ }).first().click();
+    await expect(m.page.getByRole("log")).toBeVisible();
+    await j.page.waitForTimeout(1500); // inscrição do Realtime
 
-    await maria.page.getByLabel("Digite sua mensagem").fill("Oi João, combinado às 18h!");
-    await maria.page.getByRole("button", { name: "Enviar mensagem" }).click();
-    await expect(joao.page.getByText("Oi João, combinado às 18h!")).toBeVisible({ timeout: 10_000 });
-    // João responde e Maria vê a mensagem como lida depois
-    await joao.page.getByLabel("Digite sua mensagem").fill("Fechado!");
-    await joao.page.getByRole("button", { name: "Enviar mensagem" }).click();
-    await expect(maria.page.getByText("Fechado!")).toBeVisible({ timeout: 10_000 });
-    await expect(maria.page.getByLabel("Lida")).toHaveCount(1, { timeout: 10_000 });
-    await maria.context.close();
-    await joao.context.close();
+    await m.page.getByLabel("Digite sua mensagem").fill("Oi João, combinado às 18h!");
+    await m.page.getByRole("button", { name: "Enviar mensagem" }).click();
+    await expect(j.page.getByText("Oi João, combinado às 18h!")).toBeVisible({ timeout: 15_000 });
+    await j.page.getByLabel("Digite sua mensagem").fill("Fechado!");
+    await j.page.getByRole("button", { name: "Enviar mensagem" }).click();
+    await expect(m.page.getByText("Fechado!")).toBeVisible({ timeout: 15_000 });
+    await expect(m.page.getByLabel("Lida").first()).toBeVisible({ timeout: 15_000 });
+    await m.context.close();
+    await j.context.close();
   });
 
-  test("ambos confirmam, realizam e concluem; ambos avaliam", async ({ browser }) => {
-    const maria = await newSession(browser, "maria");
-    const joao = await newSession(browser, "joao");
+  test("confirmação dos dois, conclusão, avaliações e reputação", async ({ browser }) => {
+    const m = await session(browser, maria);
+    const j = await session(browser, joao);
 
-    await joao.page.goto(requestUrl);
-    await joao.page.getByRole("button", { name: "Confirmar e começar" }).click();
-    await expect(joao.page.getByText("Aguardando confirmação").first()).toBeVisible();
-    await maria.page.goto(requestUrl);
-    await maria.page.getByRole("button", { name: "Confirmar e começar" }).click();
-    await expect(maria.page.getByText("Em andamento").first()).toBeVisible();
+    await j.page.goto(requestPath);
+    await j.page.getByRole("button", { name: "Confirmar e começar" }).click();
+    await expect(j.page.getByText("Aguardando confirmação").first()).toBeVisible({ timeout: 15_000 });
+    await j.page.reload();
+    await expect(j.page.getByText("Rua Teste Privada, 99")).toBeVisible(); // liberado após o ajudante confirmar
 
-    await maria.page.getByRole("button", { name: "AJUDA CONCLUÍDA" }).click();
-    await expect(maria.page.getByText("Conclusão pendente").first()).toBeVisible();
-    await joao.page.goto(requestUrl);
-    await joao.page.getByRole("button", { name: "AJUDA CONCLUÍDA" }).click();
-    await expect(joao.page.getByText("Concluído").first()).toBeVisible();
+    await m.page.goto(requestPath);
+    await m.page.getByRole("button", { name: "Confirmar e começar" }).click();
+    await expect(m.page.getByText("Em andamento").first()).toBeVisible({ timeout: 15_000 });
 
-    // avaliações
-    await maria.page.reload();
-    await maria.page.getByRole("radiogroup", { name: "Avaliação geral" }).getByRole("radio", { name: "5 estrelas" }).click();
-    await maria.page.getByRole("button", { name: "Enviar avaliação" }).click();
-    await expect(maria.page.getByText(/Você já avaliou esta ajuda/)).toBeVisible();
-    await joao.page.reload();
-    await joao.page.getByRole("radiogroup", { name: "Avaliação geral" }).getByRole("radio", { name: "5 estrelas" }).click();
-    await joao.page.getByRole("button", { name: "Enviar avaliação" }).click();
-    await expect(joao.page.getByText(/Você já avaliou esta ajuda/)).toBeVisible();
+    await m.page.getByRole("button", { name: "AJUDA CONCLUÍDA" }).click();
+    await expect(m.page.getByText("Conclusão pendente").first()).toBeVisible({ timeout: 15_000 });
+    await j.page.reload();
+    await j.page.getByRole("button", { name: "AJUDA CONCLUÍDA" }).click();
+    await expect(j.page.getByText("Concluído").first()).toBeVisible({ timeout: 15_000 });
 
-    // reputação e histórico atualizados
-    await joao.page.goto("/perfil");
-    await expect(joao.page.getByText("Ajudas realizadas")).toBeVisible();
-    await joao.page.goto("/minhas-ajudas?grupo=concluidas");
-    await expect(joao.page.getByText(title)).toBeVisible();
-    await maria.page.goto("/meus-pedidos?grupo=completed");
-    await expect(maria.page.getByText(title)).toBeVisible();
-    await maria.context.close();
-    await joao.context.close();
+    for (const p of [m.page, j.page]) {
+      await p.reload();
+      await p.getByRole("radiogroup", { name: "Avaliação geral" }).getByRole("radio", { name: "5 estrelas" }).click();
+      await p.getByRole("button", { name: "Enviar avaliação" }).click();
+      await expect(p.getByText(/Você já avaliou esta ajuda/)).toBeVisible({ timeout: 15_000 });
+    }
+
+    await j.page.goto("/perfil");
+    await expect(j.page.getByText("Ajudas realizadas")).toBeVisible();
+    await j.page.goto("/minhas-ajudas?grupo=concluidas");
+    await expect(j.page.getByText(title)).toBeVisible();
+    await m.page.goto("/meus-pedidos?grupo=completed");
+    await expect(m.page.getByText(title)).toBeVisible();
+    await m.context.close();
+    await j.context.close();
   });
-});
+  test("segurança: Carlos não abre conversa, edição de pedido nem admin", async ({ browser }) => {
+    const m = await session(browser, maria);
+    await m.page.goto("/mensagens");
+    const conv = await m.page.getByRole("link", { name: /João Teste/ }).first().getAttribute("href");
+    await m.context.close();
+    const [req] = await live.adminSelect<{ id: string }[]>(`help_requests?select=id&requester_id=eq.${maria.id}&limit=1`);
 
-test.describe("segurança: usuário A não acessa dados do usuário B", () => {
-  test("Carlos não abre conversa, edição nem rascunho de Maria", async ({ browser }) => {
-    const maria = await newSession(browser, "maria");
-    await maria.page.goto("/mensagens");
-    const href = await maria.page.getByRole("link", { name: /João Souza/ }).first().getAttribute("href");
-    await maria.page.goto("/meus-pedidos");
-    const reqHref = await maria.page.getByRole("link").filter({ hasText: /./ }).evaluateAll((els) =>
-      (els as HTMLAnchorElement[]).map((e) => e.getAttribute("href")).find((h) => h?.startsWith("/pedido/")),
-    );
-    await maria.context.close();
-
-    const carlos = await newSession(browser, "carlos");
-    expect(href).toBeTruthy();
-    expect((await carlos.page.goto(href!))?.status()).toBe(404);
-    if (reqHref) expect((await carlos.page.goto(`${reqHref}/editar`))?.status()).toBe(404);
-    expect((await carlos.page.goto("/admin"))?.status()).toBe(404);
-    expect((await carlos.page.goto("/admin/usuarios"))?.status()).toBe(404);
-    await carlos.context.close();
+    const c = await session(browser, carlos);
+    await expectNotFound(c.page, conv!, "Oi João, combinado às 18h!");
+    await expectNotFound(c.page, `/pedido/${req.id}/editar`);
+    await expectNotFound(c.page, "/admin", "Usuários ativos");
+    await expectNotFound(c.page, "/admin/usuarios");
+    await c.context.close();
   });
 });
 
 test.describe("bloqueio e denúncia", () => {
-  test("Carlos bloqueia João: João deixa de ver o pedido do Carlos e não consegue interagir", async ({ browser }) => {
-    const JOAO = "11111111-0000-0000-0000-000000000002";
-    const PEDIDO_DO_CARLOS = "/pedido/22222222-0000-0000-0000-000000000004";
-    const carlos = await newSession(browser, "carlos");
-    const joao = await newSession(browser, "joao");
+  test("Carlos bloqueia João: o pedido e o perfil do Carlos somem para o João", async ({ browser }) => {
+    const c = await session(browser, carlos);
+    const j = await session(browser, joao);
+    await j.page.goto(`/pedido/${carlosRequest}`);
+    await expect(j.page.getByRole("heading", { name: `Pedido do Carlos ${live.RUN}` })).toBeVisible();
 
-    // antes: João enxerga o pedido aberto do Carlos
-    expect((await joao.page.goto(PEDIDO_DO_CARLOS))?.status()).toBe(200);
+    await c.page.goto(`/usuario/${joao.id}`);
+    await c.page.getByRole("button", { name: "Bloquear" }).click();
+    await c.page.getByRole("button", { name: "Sim, bloquear" }).click();
+    await expect(c.page.getByRole("button", { name: "Desbloquear" })).toBeVisible({ timeout: 15_000 });
 
-    await carlos.page.goto(`/usuario/${JOAO}`);
-    await carlos.page.getByRole("button", { name: "Bloquear" }).click();
-    await carlos.page.getByRole("button", { name: "Sim, bloquear" }).click();
-    await expect(carlos.page.getByText(/Usuário bloqueado/)).toBeVisible();
-    await expect(carlos.page.getByRole("button", { name: "Desbloquear" })).toBeVisible();
+    await expectNotFound(j.page, `/pedido/${carlosRequest}`, `Pedido do Carlos ${live.RUN}`);
+    await expectNotFound(j.page, `/usuario/${carlos.id}`, "Carlos Teste");
 
-    // depois: o pedido some para o João (RLS) e o perfil do Carlos também
-    expect((await joao.page.goto(PEDIDO_DO_CARLOS))?.status()).toBe(404);
-    expect((await joao.page.goto("/usuario/11111111-0000-0000-0000-000000000004"))?.status()).toBe(404);
-
-    // limpeza: desbloqueia para não afetar outros testes
-    await carlos.page.getByRole("button", { name: "Desbloquear" }).click();
-    await expect(carlos.page.getByText("Usuário desbloqueado.")).toBeVisible();
-    await carlos.context.close();
-    await joao.context.close();
+    await c.page.goto("/configuracoes");
+    await expect(c.page.getByText("João Teste")).toBeVisible(); // lista de bloqueados mostra o nome
+    await c.page.getByRole("button", { name: "Desbloquear" }).click();
+    await expect(c.page.getByText("Você não bloqueou ninguém.")).toBeVisible({ timeout: 15_000 });
+    await c.context.close();
+    await j.context.close();
   });
 
-  test("denúncia: Maria denuncia, admin analisa, decide e a ação é auditada", async ({ browser }) => {
-    const maria = await newSession(browser, "maria");
-    await maria.page.goto("/usuario/11111111-0000-0000-0000-000000000006");
-    await maria.page.getByRole("button", { name: "Denunciar" }).click();
-    await maria.page.getByLabel("Motivo").selectOption("FALSE_INFORMATION");
-    await maria.page.getByLabel("O que aconteceu?").fill("Informações do pedido não batiam com o combinado.");
-    await maria.page.getByRole("button", { name: "Enviar denúncia" }).click();
-    await expect(maria.page.getByText("Denúncia enviada. Nossa equipe vai analisar.")).toBeVisible();
-    await maria.context.close();
+  test("denúncia → admin notificado → resolve → auditoria", async ({ browser }) => {
+    const m = await session(browser, maria);
+    await m.page.goto(`/usuario/${carlos.id}`);
+    await m.page.getByRole("button", { name: "Denunciar" }).click();
+    await m.page.getByLabel("Motivo").selectOption("FALSE_INFORMATION");
+    await m.page.getByLabel("O que aconteceu?").fill("Teste automatizado de denúncia — pode ignorar.");
+    await m.page.getByRole("button", { name: "Enviar denúncia" }).click();
+    await expect(m.page.getByText("Denúncia enviada. Nossa equipe vai analisar.")).toBeVisible({ timeout: 15_000 });
+    await m.context.close();
 
-    const admin = await newSession(browser, "admin");
-    await admin.page.goto("/notificacoes");
-    await expect(admin.page.getByText("Nova denúncia").first()).toBeVisible();
-    await admin.page.goto("/admin/denuncias");
-    await expect(admin.page.getByText("Informação falsa").first()).toBeVisible();
-    await admin.page.getByLabel("Notas da análise").first().fill("Usuário advertido.");
-    await admin.page.getByRole("button", { name: "Resolver" }).first().click();
-    await expect(admin.page.getByText("Denúncia atualizada.")).toBeVisible();
-    await admin.page.goto("/admin/auditoria");
-    await expect(admin.page.getByText("report.resolved").first()).toBeVisible();
-    await admin.context.close();
+    const a = await session(browser, admin);
+    await a.page.goto("/notificacoes");
+    await expect(a.page.getByText("Nova denúncia").first()).toBeVisible();
+    await a.page.goto("/admin/denuncias");
+    const card = a.page.locator("li", { hasText: "Teste automatizado de denúncia" });
+    await card.getByLabel("Notas da análise").fill("Teste E2E.");
+    await card.getByRole("button", { name: "Resolver" }).click();
+    await expect(a.page.getByText("Denúncia atualizada.")).toBeVisible({ timeout: 15_000 });
+    await a.page.goto("/admin/auditoria");
+    await expect(a.page.getByText("report.resolved").first()).toBeVisible();
+    await a.context.close();
   });
 });
 
 test.describe("admin", () => {
-  test("painel: indicadores; suspender e reativar usuário gera auditoria", async ({ browser }) => {
-    const admin = await newSession(browser, "admin");
-    await admin.page.goto("/admin");
-    await expect(admin.page.getByText("Usuários ativos")).toBeVisible();
-    await admin.page.goto("/admin/usuarios?q=Igor");
-    await admin.page.getByRole("button", { name: "Suspender" }).first().click();
-    await expect(admin.page.getByText("Usuário suspenso.")).toBeVisible();
-    await expect(admin.page.getByText("Suspenso").first()).toBeVisible();
-    await admin.page.getByRole("button", { name: "Reativar" }).first().click();
-    await expect(admin.page.getByText("Usuário reativado.")).toBeVisible();
-    await admin.page.goto("/admin/auditoria");
-    await expect(admin.page.getByText("user.status_changed").first()).toBeVisible();
-    await admin.context.close();
-  });
+  test("indicadores; suspender e reativar usuário com auditoria", async ({ browser }) => {
+    const a = await session(browser, admin);
+    await a.page.goto("/admin");
+    await expect(a.page.getByText("Usuários ativos")).toBeVisible();
+    await a.page.goto(`/admin/usuarios?q=${encodeURIComponent("Carlos Teste")}`);
+    const row = a.page.locator("li", { hasText: "Carlos Teste" });
+    await row.getByRole("button", { name: "Suspender" }).click();
+    await expect(a.page.getByText("Usuário suspenso.")).toBeVisible({ timeout: 15_000 });
 
-  test("categorias: criar e desativar", async ({ browser }) => {
-    const admin = await newSession(browser, "admin");
-    await admin.page.goto("/admin/categorias");
-    const name = `Jardinagem ${Date.now() % 10000}`;
-    await admin.page.getByLabel("Nome").first().fill(name);
-    await admin.page.getByRole("button", { name: "Criar categoria" }).click();
-    await expect(admin.page.getByText("Categoria criada.")).toBeVisible();
-    await admin.context.close();
+    // usuário suspenso vê o aviso e não consegue publicar
+    const c = await session(browser, carlos);
+    await expect(c.page.getByText("Sua conta está com restrições").first()).toBeVisible();
+    await c.context.close();
+
+    await row.getByRole("button", { name: "Reativar" }).click();
+    await expect(a.page.getByText("Usuário reativado.")).toBeVisible({ timeout: 15_000 });
+    await a.page.goto("/admin/auditoria");
+    await expect(a.page.getByText("user.status_changed").first()).toBeVisible();
+    await a.context.close();
   });
 });

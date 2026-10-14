@@ -22,6 +22,20 @@ async function siteUrl() {
   return origin ?? publicEnv.siteUrl;
 }
 
+/** Traduz erros do Supabase Auth para mensagens úteis (sem revelar se um e-mail existe). */
+function authErrorMessage(error: { message?: string; code?: string; status?: number }): string {
+  const code = error.code ?? "";
+  const msg = error.message ?? "";
+  if (code === "over_email_send_rate_limit" || /email rate limit/i.test(msg))
+    return "Recebemos muitos pedidos de e-mail agora. Aguarde alguns minutos e tente novamente.";
+  if (code === "over_request_rate_limit" || error.status === 429)
+    return "Muitas tentativas em pouco tempo. Aguarde um pouco e tente novamente.";
+  if (code === "email_address_invalid" || /invalid.*email|email.*invalid/i.test(msg)) return "Este e-mail não parece válido. Confira e tente de novo.";
+  if (code === "weak_password" || /password/i.test(msg)) return "Escolha uma senha mais forte (letras, números e ao menos 8 caracteres).";
+  if (code === "signup_disabled") return "Novos cadastros estão temporariamente desativados.";
+  return GENERIC_ERROR;
+}
+
 function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
   const out: Record<string, string> = {};
   for (const i of issues) {
@@ -59,7 +73,7 @@ export async function signUpAction(input: unknown): Promise<ActionResult> {
   if (error) {
     logServerError("auth.signUp", error);
     if (/already|registered/i.test(error.message)) return { ok: false, message: "Já existe uma conta com este e-mail. Tente entrar." };
-    return { ok: false, message: GENERIC_ERROR };
+    return { ok: false, message: authErrorMessage(error) };
   }
   // E-mail já cadastrado com confirmação ligada: o Supabase devolve user sem identities (não revela existência).
   if (data.session) redirect("/boas-vindas");
@@ -95,7 +109,11 @@ export async function forgotPasswordAction(input: unknown): Promise<ActionResult
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${await siteUrl()}/auth/callback?next=/redefinir-senha`,
   });
-  if (error) logServerError("auth.forgot", error);
+  if (error) {
+    logServerError("auth.forgot", error);
+    // limite de envio é o único erro que vale mostrar (não revela se a conta existe)
+    if (error.status === 429) return { ok: false, message: authErrorMessage(error) };
+  }
   // Resposta idêntica com ou sem conta: evita enumeração de usuários.
   return { ok: true, message: "Se houver uma conta com este e-mail, enviamos as instruções para redefinir a senha." };
 }

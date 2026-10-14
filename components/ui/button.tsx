@@ -7,7 +7,8 @@ const base =
 
 const variants = {
   primary: "bg-brand-700 text-white hover:bg-brand-800",
-  warm: "bg-warm-600 text-white hover:bg-warm-700",
+  // warm-700 garante contraste AA (5,2:1) com texto branco; warm-600 ficava em 3,6:1
+  warm: "bg-warm-700 text-white hover:bg-orange-800",
   secondary: "bg-white text-ink border border-line hover:bg-slate-50",
   ghost: "text-ink-muted hover:bg-slate-100",
   danger: "bg-danger-600 text-white hover:bg-danger-700",

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LogOut } from "lucide-react";
-import { BlockedUsers, NotificationSettings, PrivacySettings } from "@/components/profile/settings-forms";
+import { Download, LogOut } from "lucide-react";
+import { BlockedUsers, DeleteAccount, NotificationSettings, PrivacySettings } from "@/components/profile/settings-forms";
 import { PageHeader } from "@/components/ui/display";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { signOutAction } from "@/app/actions/auth";
 import { getSupabase, requireUser } from "@/lib/auth/session";
 import { getPrefs } from "@/services/notifications";
@@ -31,6 +31,16 @@ export default async function SettingsPage() {
       <section aria-labelledby="bloqueios" className="space-y-3">
         <h2 id="bloqueios" className="text-xl font-extrabold">Pessoas bloqueadas</h2>
         <BlockedUsers users={blocked} />
+      </section>
+      <section aria-labelledby="dados" className="space-y-3">
+        <h2 id="dados" className="text-xl font-extrabold">Seus dados (LGPD)</h2>
+        <p className="text-sm text-ink-muted">Baixe uma cópia de tudo o que guardamos sobre você, ou exclua sua conta.</p>
+        <div className="flex flex-wrap gap-3">
+          <a href="/api/conta/exportar" className={buttonClasses({ variant: "secondary" })} download>
+            <Download className="size-5" aria-hidden /> Baixar meus dados
+          </a>
+        </div>
+        <DeleteAccount />
       </section>
       <section aria-labelledby="conta" className="space-y-3">
         <h2 id="conta" className="text-xl font-extrabold">Conta</h2>

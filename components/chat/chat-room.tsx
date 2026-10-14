@@ -89,7 +89,7 @@ export function ChatRoom({
       {closed || blockedNotice ? (
         <div className="mt-3"><Notice tone="info">{blockedNotice ?? "Esta conversa foi encerrada."}</Notice></div>
       ) : (
-        <form onSubmit={send} className="mt-3 flex items-end gap-2">
+        <form method="post" onSubmit={send} className="mt-3 flex items-end gap-2">
           <label htmlFor="chat-input" className="sr-only">Digite sua mensagem</label>
           <textarea
             id="chat-input" value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000}

@@ -115,22 +115,42 @@ export interface NotifyInput {
  * Para eventos disparados pelo servidor (ex.: fan-out de matching). Eventos de fluxo (proposta, mensagem…)
  * já criam a notificação dentro das RPCs transacionais; basta chamar schedulePushDispatch() depois.
  */
+/** Só cria a notificação interna (respeitando preferências). Não agenda push — use para lotes. */
+export async function createInAppNotification(admin: Admin, input: NotifyInput): Promise<string | null> {
+  const { data, error } = await admin.rpc("create_notification", {
+    p_user: input.userId,
+    p_type: input.type,
+    p_title: input.title,
+    p_body: input.body,
+    p_url: input.url ?? null,
+    p_data: input.data ?? {},
+  });
+  if (error) {
+    logServerError("notification.create", error, { type: input.type });
+    return null;
+  }
+  return (data as string | null) ?? null;
+}
+
+/** Envia o push pendente imediatamente (para uso dentro de um `after()` já agendado). */
+export async function dispatchNow(admin: Admin) {
+  if (!isPushConfigured()) return;
+  try {
+    await dispatchPendingPush(admin, 100);
+  } catch (err) {
+    logServerError("push.dispatch", err);
+  }
+}
+
+/**
+ * Fachada única: 1) cria a notificação interna (respeitando preferências) 2) agenda o push.
+ * Para eventos disparados pelo servidor. Eventos de fluxo (proposta, mensagem…) já criam a
+ * notificação dentro das RPCs transacionais; basta chamar schedulePushDispatch() depois.
+ */
 export const NotificationService = {
   async notify(input: NotifyInput): Promise<string | null> {
-    const admin = createAdminClient();
-    const { data, error } = await admin.rpc("create_notification", {
-      p_user: input.userId,
-      p_type: input.type,
-      p_title: input.title,
-      p_body: input.body,
-      p_url: input.url ?? null,
-      p_data: input.data ?? {},
-    });
-    if (error) {
-      logServerError("notification.create", error, { type: input.type });
-      return null;
-    }
-    schedulePushDispatch();
-    return (data as string | null) ?? null;
+    const id = await createInAppNotification(createAdminClient(), input);
+    if (id) schedulePushDispatch();
+    return id;
   },
 };

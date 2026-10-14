@@ -112,7 +112,7 @@ export function ProfileEditForm({
       <Card className="flex items-center gap-4">
         <Avatar name={initial.fullName} src={avatarUrl} size={80} />
         <div>
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" id="avatar" onChange={(e) => onAvatar(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" id="avatar" aria-label="Escolher foto de perfil" onChange={(e) => onAvatar(e.target.files?.[0])} />
           <Button variant="secondary" size="sm" loading={uploading} onClick={() => fileRef.current?.click()}><Camera className="size-4" aria-hidden /> Trocar foto</Button>
           <p className="mt-1 text-xs text-ink-muted">JPG, PNG ou WebP até 2 MB.</p>
         </div>

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { withUser, toAction, parseInput } from "@/lib/actions";
+import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { withUser, toAction, toVoid, parseInput } from "@/lib/actions";
 import { helperPrefsSchema, notificationPrefsSchema, privacySchema, profileUpdateSchema, uuid } from "@/lib/validations";
 import { publicEnv } from "@/lib/env";
 import * as helper from "@/services/helper";
@@ -81,6 +83,26 @@ export async function markNotificationReadAction(id: string): Promise<ActionResu
     const r = await markRead(db, userId, id);
     return toAction("notifications.read", r);
   });
+}
+
+/**
+ * LGPD — exclusão de conta. Exige digitar EXCLUIR. O banco (gatilho profiles_before_delete)
+ * reabre/cancela ajudas em andamento, avisa as contrapartes e anonimiza mensagens.
+ */
+export async function deleteAccountAction(confirmation: string): Promise<ActionResult> {
+  const res = await withUser("account.delete", async ({ db, userId }) => {
+    if (confirmation.trim().toUpperCase() !== "EXCLUIR") return { ok: false, message: "Digite EXCLUIR para confirmar." };
+    const profile = await getProfile(db, userId);
+    if (profile && (profile.role === "ADMIN" || profile.role === "SUPER_ADMIN")) {
+      return { ok: false, message: "Contas de administrador não podem ser excluídas por aqui." };
+    }
+    const { error } = await createAdminClient().auth.admin.deleteUser(userId);
+    if (error) return toVoid("account.delete", { ok: false, error });
+    await db.auth.signOut().catch(() => undefined);
+    return { ok: true };
+  });
+  if (res.ok) redirect("/?conta=excluida");
+  return res;
 }
 
 export async function markAllNotificationsReadAction(): Promise<ActionResult> {
