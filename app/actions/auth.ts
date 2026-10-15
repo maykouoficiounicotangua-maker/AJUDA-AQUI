@@ -36,6 +36,12 @@ function authErrorMessage(error: { message?: string; code?: string; status?: num
   return GENERIC_ERROR;
 }
 
+/** Onboarding devolve a pessoa para onde ela estava (ex.: o pedido que ela queria ajudar). */
+function onboardingUrl(next?: string) {
+  const target = safeInternalUrl(next, "");
+  return target ? `/boas-vindas?next=${encodeURIComponent(target)}` : "/boas-vindas";
+}
+
 function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
   const out: Record<string, string> = {};
   for (const i of issues) {
@@ -45,7 +51,7 @@ function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
   return out;
 }
 
-export async function signUpAction(input: unknown): Promise<ActionResult> {
+export async function signUpAction(input: unknown, next?: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return NOT_CONFIGURED;
   const parsed = signUpSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Revise os campos destacados.", fieldErrors: fieldErrors(parsed.error.issues) };
@@ -56,7 +62,7 @@ export async function signUpAction(input: unknown): Promise<ActionResult> {
     email: v.email,
     password: v.password,
     options: {
-      emailRedirectTo: `${await siteUrl()}/auth/callback?next=/boas-vindas`,
+      emailRedirectTo: `${await siteUrl()}/auth/callback?next=${encodeURIComponent(onboardingUrl(next))}`,
       data: {
         full_name: v.fullName,
         phone: v.phone,
@@ -76,7 +82,7 @@ export async function signUpAction(input: unknown): Promise<ActionResult> {
     return { ok: false, message: authErrorMessage(error) };
   }
   // E-mail já cadastrado com confirmação ligada: o Supabase devolve user sem identities (não revela existência).
-  if (data.session) redirect("/boas-vindas");
+  if (data.session) redirect(onboardingUrl(next));
   return { ok: true, message: "Enviamos um link de confirmação para o seu e-mail. Abra-o para ativar a conta." };
 }
 

@@ -15,14 +15,14 @@ const slides = [
   { icon: ShieldCheck, title: "Ajude com segurança", text: "Seu endereço fica protegido, o chat é interno e você pode bloquear e denunciar." },
 ];
 
-export function Onboarding({ firstName }: { firstName: string }) {
+export function Onboarding({ firstName, next = "/inicio" }: { firstName: string; next?: string }) {
   const [step, setStep] = useState(0);
   const router = useRouter();
   const { run, pending } = useRunAction();
   const last = step === slides.length - 1;
   const slide = slides[step];
 
-  const finish = () => run(() => completeOnboardingAction(), { refresh: false, silent: true, onSuccess: () => router.replace("/inicio") });
+  const finish = () => run(() => completeOnboardingAction(), { refresh: false, silent: true, onSuccess: () => router.replace(next) });
 
   return (
     <section aria-labelledby="onb-title" className="rounded-[var(--radius-card)] border border-line bg-white p-6 text-center shadow-sm">

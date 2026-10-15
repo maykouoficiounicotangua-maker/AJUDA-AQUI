@@ -32,7 +32,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
             <li key={u.id}>
               <Card className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <Link href={`/usuario/${u.id}`} className="font-bold underline-offset-2 hover:underline">{u.full_name}</Link>
+                  <Link href={`/admin/usuarios/${u.id}`} className="font-bold underline-offset-2 hover:underline">{u.full_name}</Link>
                   <p className="text-sm text-ink-muted">{[u.city, u.state].filter(Boolean).join(" / ")} · {u.role}</p>
                 </div>
                 <Badge tone={TONE[u.status]}>{{ ACTIVE: "Ativo", SUSPENDED: "Suspenso", BLOCKED: "Bloqueado", DELETED: "Excluído" }[u.status]}</Badge>

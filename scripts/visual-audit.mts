@@ -24,17 +24,44 @@ async function login(page: Page, email: string) {
 async function audit(page: Page, name: string, path: string) {
   await page.goto(base + path);
   await page.waitForLoadState("networkidle");
+  // rola até o fim para disparar as animações de entrada (como um usuário faria)
+  await page.evaluate(async () => {
+    for (let y = 0; y < document.body.scrollHeight; y += 400) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); }
+    window.scrollTo(0, 0);
+  });
+  await page.waitForTimeout(900);
   const w = page.viewportSize()!.width;
   await page.screenshot({ path: `${out}/${name}-${w}.png`, fullPage: true });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (overflow > 0) issues.push(`[${w}px] ${path}: rolagem horizontal de ${overflow}px`);
-  if (w === 390) {
+  if (w === 390 || w === 360) {
     const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
     for (const v of r.violations) issues.push(`[axe] ${path}: ${v.id} (${v.impact}) — ${v.help} → ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join(" | ")}`);
   }
 }
 
 try {
+  // VISITANTE (sem login)
+  for (const width of [360, 390, 1280]) {
+    const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: "pt-BR" });
+    const v = await ctx.newPage();
+    await audit(v, "v-landing", "/");
+    await audit(v, "v-explorar", "/explorar");
+    await audit(v, "v-pedido", `/pedido/${reqId}`);
+    await audit(v, "v-novo", "/pedido/novo");
+    await audit(v, "v-entrar", "/entrar?next=%2Fpedido%2Fnovo");
+    await ctx.close();
+  }
+  // ADMIN
+  {
+    const adm = await live.createUser("vadmin", "Admin Visual", { role: "ADMIN" });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "pt-BR" });
+    const a = await ctx.newPage();
+    await login(a, adm.email);
+    await audit(a, "admin", "/admin");
+    await audit(a, "admin-usuario", `/admin/usuarios/${joao.id}`);
+    await ctx.close();
+  }
   for (const width of [390, 1280]) {
     const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: "pt-BR" });
     const j = await ctx.newPage();

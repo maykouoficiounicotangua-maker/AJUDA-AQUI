@@ -3,13 +3,62 @@ import { expect, test } from "@playwright/test";
 const VIEWPORTS = [320, 375, 390, 430, 768, 1024, 1280, 1440];
 
 test.describe("páginas públicas", () => {
-  test("landing: título, slogan e CTAs", async ({ page }) => {
+  test("landing explicativa: CTAs sem login, demonstração animada, como funciona e FAQ", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/AJUDA AQUI — Pessoas ajudando pessoas\./);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Pessoas ajudando");
-    await expect(page.getByRole("link", { name: /Preciso de ajuda/ })).toHaveAttribute("href", "/cadastrar");
-    await expect(page.getByRole("link", { name: /Quero ajudar/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Entrar" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("mãozinha");
+    // os CTAs levam direto ao app, sem exigir cadastro
+    await expect(page.getByRole("link", { name: /Pedir ajuda agora/ })).toHaveAttribute("href", "/pedido/novo");
+    await expect(page.getByRole("link", { name: /Ver quem precisa de ajuda/ })).toHaveAttribute("href", "/explorar");
+    // demonstração animada com 4 etapas navegáveis
+    const steps = page.getByRole("tablist", { name: "Etapas da demonstração" }).getByRole("tab");
+    await expect(steps).toHaveCount(4);
+    await steps.nth(2).click();
+    await expect(page.getByText("3. Eles combinam tudo pelo chat do app")).toBeVisible();
+    // como funciona: alterna entre pedir e ajudar
+    await page.getByRole("tab", { name: /Quero ajudar/ }).click();
+    await expect(page.getByRole("heading", { name: "Veja pedidos perto de você" })).toBeVisible();
+    // FAQ
+    await page.getByText("Preciso me cadastrar para ver os pedidos?").click();
+    await expect(page.getByText(/O cadastro só é pedido quando você quiser/)).toBeVisible();
+  });
+
+  test("visitante navega sem login: pedidos e criação de pedido abrem direto", async ({ page }) => {
+    await page.goto("/explorar");
+    await expect(page).toHaveURL(/\/explorar/);
+    await expect(page.getByRole("heading", { name: "Pedidos de ajuda" })).toBeVisible();
+    await expect(page.getByText(/só nessa hora pedimos seu cadastro/)).toBeVisible();
+    await page.goto("/pedido/novo");
+    await expect(page.getByRole("heading", { name: "Do que você precisa?" })).toBeVisible();
+    // área pessoal continua protegida e volta para onde ia depois do login
+    await page.goto("/inicio");
+    await expect(page).toHaveURL(/\/entrar\?next=%2Finicio/);
+  });
+
+  test("visitante preenche o pedido inteiro e só na publicação é levado ao cadastro, com o pedido salvo", async ({ page }) => {
+    await page.goto("/pedido/novo");
+    await page.getByRole("radio").first().click();
+    await page.getByLabel(/Título do pedido/).fill("Pedido de visitante para teste");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await page.getByLabel(/Descreva o que precisa/).fill("Descrição feita antes de criar a conta.");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await page.getByLabel(/^Data/).fill("2099-05-10");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await page.getByLabel("Estado").selectOption("RJ");
+    await page.getByRole("combobox", { name: /^Cidade/ }).fill("Niterói");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await page.getByRole("button", { name: "Continuar" }).click(); // gratuita
+    await expect(page.getByText(/Para publicar, você cria sua conta grátis/)).toBeVisible();
+    await page.getByRole("button", { name: /Publicar pedido \(criar conta\)/ }).click();
+    await expect(page).toHaveURL(/\/cadastrar\?next=%2Fpedido%2Fnovo/);
+    await expect(page.getByText(/Seu pedido está salvo neste aparelho/)).toBeVisible();
+    const draft = await page.evaluate(() => JSON.parse(localStorage.getItem("aa:request-wizard") ?? "{}"));
+    expect(draft.title).toBe("Pedido de visitante para teste");
+  });
+
+  test("página offline existe para o Service Worker", async ({ page }) => {
+    await page.goto("/offline");
+    await expect(page.getByRole("heading", { name: "Você está sem internet" })).toBeVisible();
   });
 
   test("segurança: orientações e aviso de responsabilidade", async ({ page }) => {
@@ -73,9 +122,12 @@ test.describe("PWA, SEO e segurança de borda", () => {
     const res = await request.get("/manifest.webmanifest");
     expect(res.ok()).toBe(true);
     const m = await res.json();
-    expect(m).toMatchObject({ short_name: "Ajuda Aqui", display: "standalone", lang: "pt-BR", start_url: "/inicio" });
+    expect(m).toMatchObject({ short_name: "Ajuda Aqui", display: "standalone", lang: "pt-BR", id: "/", start_url: "/?origem=app" });
     expect(m.icons.length).toBeGreaterThanOrEqual(3);
     for (const icon of m.icons) expect((await request.get(icon.src)).ok()).toBe(true);
+    // capturas para o diálogo de instalação "rico" (Android/Chrome)
+    expect(m.screenshots.some((x: { form_factor: string }) => x.form_factor === "narrow")).toBe(true);
+    for (const shot of m.screenshots) expect((await request.get(shot.src)).ok()).toBe(true);
   });
 
   test("service worker servido sem cache, com tipo JavaScript e sem segredos", async ({ request }) => {

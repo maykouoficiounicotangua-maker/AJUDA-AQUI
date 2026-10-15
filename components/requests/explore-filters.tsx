@@ -21,7 +21,7 @@ const TYPE_CHIPS = [
 ];
 
 /** Filtros no estado da URL: o servidor filtra, ordena e pagina. Busca por texto com debounce. */
-export function ExploreFilters({ categories, defaultState }: { categories: Category[]; defaultState: string }) {
+export function ExploreFilters({ categories, defaultState, visitor = false }: { categories: Category[]; defaultState: string; visitor?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -109,13 +109,15 @@ export function ExploreFilters({ categories, defaultState }: { categories: Categ
           onBlur={(e) => e.target.value !== (params.get("bairro") ?? "") && update({ bairro: e.target.value.trim() })}
           onKeyDown={(e) => e.key === "Enter" && update({ bairro: e.currentTarget.value.trim() })}
         />
-        <Select aria-label="Distância" value={params.get("km") ?? ""} onChange={(e) => update({ km: e.target.value })}>
+        {!visitor && (
+          <Select aria-label="Distância" value={params.get("km") ?? ""} onChange={(e) => update({ km: e.target.value })}>
           <option value="">Qualquer distância</option>
           {[5, 10, 25, 50, 100].map((k) => <option key={k} value={k}>até {k} km</option>)}
         </Select>
-        <Select aria-label="Ordenar por" value={params.get("ordem") ?? "match"} onChange={(e) => update({ ordem: e.target.value })}>
-          <option value="match">Mais compatíveis</option>
-          <option value="nearest">Mais próximos</option>
+        )}
+        <Select aria-label="Ordenar por" value={params.get("ordem") ?? (visitor ? "recent" : "match")} onChange={(e) => update({ ordem: e.target.value })}>
+          {!visitor && <option value="match">Mais compatíveis</option>}
+          {!visitor && <option value="nearest">Mais próximos</option>}
           <option value="recent">Mais recentes</option>
           <option value="time">Horário</option>
           <option value="category">Categoria</option>

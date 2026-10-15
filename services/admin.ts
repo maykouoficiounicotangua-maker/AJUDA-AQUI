@@ -109,3 +109,52 @@ export async function setCategoryActive(db: Db, id: string, active: boolean): Pr
   const { error } = await db.from("categories").update({ active }).eq("id", id);
   return error ? fail(error) : ok(undefined);
 }
+
+// ---------- Métricas completas (migration 0009) ----------
+export interface RankedUser { id: string; name: string; city: string | null; helps?: number; requests?: number; completed?: number; rating?: number | null; reviews?: number; reports?: number; status?: string }
+export interface AdminMetrics {
+  period_days: number;
+  users: Record<"total" | "active_status" | "suspended" | "blocked" | "new_period" | "new_7d" | "active_1d" | "active_7d" | "active_30d" | "onboarded" | "helpers_available" | "with_push" | "admins", number>;
+  requests: {
+    total: number; open: number; in_progress: number; completed: number; cancelled: number; expired: number; disputed: number; drafts: number;
+    created_period: number; completed_period: number; with_offer_pct: number | null; avg_offers: number | null;
+    median_hours_first_offer: number | null; completion_rate_pct: number | null; paid_volume_cents: number; by_type: Record<string, number> | null;
+  };
+  offers: { total: number; period: number; accepted: number };
+  engagement: { messages_period: number; reviews_total: number; avg_rating: number | null; request_views_period: number; logins_period: number };
+  safety: { reports_open: number; reports_period: number; disputes_open: number; blocks_total: number; reports_by_reason: Record<string, number> };
+  push: { subscriptions_active: number; sent_period: number; failed_period: number; notifications_period: number };
+  funnel: { signups: number; onboarded: number; first_request: number; first_offer: number; first_completion: number };
+  series: { day: string; signups: number; requests: number; completed: number; offers: number; messages: number }[];
+  categories: { name: string; requests: number; completed: number; helpers: number }[];
+  cities: { city: string; state: string; users: number; requests: number }[];
+  top_helpers: RankedUser[];
+  top_requesters: RankedUser[];
+  top_rated: RankedUser[];
+  most_reported: RankedUser[];
+}
+
+export async function getMetrics(db: Db, days: number): Promise<AdminMetrics | null> {
+  const { data, error } = await db.rpc("admin_metrics", { p_days: days });
+  if (error) {
+    console.error(JSON.stringify({ level: "error", scope: "admin.metrics", message: error.message }));
+    return null;
+  }
+  return data as AdminMetrics;
+}
+
+export interface UserOverview {
+  email: string; created_at: string; last_sign_in_at: string | null; email_confirmed: boolean; phone: string | null;
+  requests: number; requests_completed: number; helps_completed: number; offers: number; messages: number;
+  reviews_received: number; avg_rating: number | null; reports_against: number; reports_made: number; blocked_by: number; push_devices: number;
+}
+
+export async function getUserOverview(db: Db, userId: string): Promise<UserOverview | null> {
+  const { data, error } = await db.rpc("admin_user_overview", { p_user: userId });
+  return error ? null : (data as UserOverview);
+}
+
+export async function broadcast(db: Db, title: string, body: string, url?: string, state?: string): Promise<ServiceResult<number>> {
+  const { data, error } = await db.rpc("admin_broadcast", { p_title: title, p_body: body, p_url: url || null, p_state: state || null });
+  return error ? fail(error) : ok(data as number);
+}

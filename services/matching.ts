@@ -73,3 +73,43 @@ export async function findCompatibleHelpers(admin: Db, request: HelpRequest, min
 
   return matching.rankHelpersForRequest(req, helpers).filter((h) => h.match.score >= minScore);
 }
+
+interface CandidateRow {
+  user_id: string; category_ids: string[]; state: string | null; city: string | null; neighborhood: string | null;
+  latitude: number | null; longitude: number | null; max_distance_km: number;
+  accepts_paid: boolean; accepts_free: boolean; accepts_exchange: boolean;
+  available_days: number[]; availability_start: string; availability_end: string;
+  match_scope: "COMPATIBLE" | "NEARBY"; distance_km: number | null;
+}
+
+/**
+ * Quem deve ser avisado de um pedido recém-publicado, respeitando a escolha de cada pessoa:
+ *  - COMPATIBLE: só se o motor de matching considerar boa compatibilidade (score ≥ minScore);
+ *  - NEARBY: qualquer pedido na cidade dela ou dentro da distância máxima que ela definiu.
+ * A pré-seleção (cidade/distância, bloqueios, preferências) é feita no banco (helper_candidates).
+ */
+export async function findHelpersToNotify(admin: Db, request: HelpRequest, minScore = 55) {
+  const { data, error } = await admin.rpc("helper_candidates", { p_request: request.id, p_limit: 500 });
+  if (error) {
+    // banco sem a migration 0008: comportamento anterior (só compatíveis por categoria)
+    console.error(JSON.stringify({ level: "warn", scope: "matching.candidates", message: error.message }));
+    return (await findCompatibleHelpers(admin, request, minScore)).map((h) => ({ userId: h.userId, score: h.match.score, scope: "COMPATIBLE" as const }));
+  }
+  const req = toMatchRequest(request);
+  return ((data as CandidateRow[] | null) ?? [])
+    .map((c) => {
+      const helper = toMatchHelper(
+        c.user_id, c.category_ids,
+        {
+          user_id: c.user_id, description: null, state: c.state, city: c.city, neighborhood: c.neighborhood,
+          latitude: c.latitude, longitude: c.longitude, max_distance_km: c.max_distance_km,
+          accepts_paid: c.accepts_paid, accepts_free: c.accepts_free, accepts_exchange: c.accepts_exchange,
+          available_days: c.available_days, availability_start: c.availability_start, availability_end: c.availability_end, active: true,
+        },
+        null, null,
+      );
+      return { userId: c.user_id, score: matching.score(req, helper).score, scope: c.match_scope };
+    })
+    .filter((c) => c.scope === "NEARBY" || c.score >= minScore)
+    .sort((a, b) => b.score - a.score);
+}

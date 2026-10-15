@@ -78,11 +78,25 @@ export function NotificationSettings({ initial }: { initial: NotificationPrefs }
         )}
       </div>
       {PREFERENCE_LABELS.map((l) => (
-        <Switch
-          key={l.column} label={l.label} description={l.hint}
-          checked={p[l.column as keyof NotificationPrefs]} disabled={!p.in_app_enabled}
-          onChange={(c) => update({ [l.column]: c } as Partial<NotificationPrefs>)}
-        />
+        <div key={l.column}>
+          <Switch
+            label={l.label} description={l.hint}
+            checked={Boolean(p[l.column as keyof NotificationPrefs])} disabled={!p.in_app_enabled}
+            onChange={(c) => update({ [l.column]: c } as Partial<NotificationPrefs>)}
+          />
+          {l.column === "pref_matches" && p.pref_matches && p.in_app_enabled && (
+            <div className="mb-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Quais pedidos novos avisar">
+              {([["COMPATIBLE", "Só os que combinam comigo"], ["NEARBY", "Todos perto de mim"]] as const).map(([v, label]) => (
+                <button
+                  key={v} type="button" role="radio" aria-checked={p.match_scope === v} onClick={() => update({ match_scope: v })}
+                  className={`min-h-11 rounded-2xl border px-3 text-sm font-semibold ${p.match_scope === v ? "border-brand-700 bg-brand-50 text-brand-800" : "border-line"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       ))}
     </Card>
   );

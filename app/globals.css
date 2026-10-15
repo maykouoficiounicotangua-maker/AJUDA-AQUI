@@ -72,3 +72,43 @@ body {
     padding-bottom: 2rem;
   }
 }
+
+/* ---------- Animações ---------- */
+@keyframes sheet-in {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.animate-sheet-in { animation: sheet-in 260ms cubic-bezier(.2,.8,.2,1); }
+
+/* Sensação de app nativo quando instalado */
+@media (display-mode: standalone) {
+  body { overscroll-behavior-y: none; -webkit-user-select: none; user-select: none; }
+  input, textarea, [contenteditable], p, li, h1, h2, h3 { -webkit-user-select: text; user-select: text; }
+}
+
+/* ---------- Demonstração animada da landing ---------- */
+@keyframes scene-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-24px); } to { opacity: 1; transform: none; } }
+@keyframes press { 0%, 55% { transform: scale(1); } 65% { transform: scale(.94); } 75%, 100% { transform: scale(1); } }
+@keyframes fade-late { 0%, 60% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes bubble { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes star { from { opacity: 0; transform: scale(.3) rotate(-30deg); } to { opacity: 1; transform: none; } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.animate-scene-in { animation: scene-in 450ms ease-out both; }
+.animate-drop-in { animation: drop-in 500ms cubic-bezier(.2,.8,.2,1) 200ms both; }
+.animate-press { animation: press 2.4s ease-in-out both; }
+.animate-fade-late { animation: fade-late 2.6s ease-out both; }
+.animate-bubble-1 { animation: bubble 400ms ease-out 300ms both; }
+.animate-bubble-2 { animation: bubble 400ms ease-out 1300ms both; }
+.animate-bubble-3 { animation: bubble 400ms ease-out 2300ms both; }
+.animate-pop { animation: pop 600ms cubic-bezier(.2,.8,.2,1) both; }
+.animate-star { animation: star 400ms ease-out both; }
+.animate-float { animation: float 5s ease-in-out infinite; }
+
+/* Reveal: só esconde quando há JS (html.js); sem JS/buscadores o conteúdo aparece normalmente */
+.reveal { transition: opacity 700ms ease-out, transform 700ms ease-out; }
+html.js .reveal:not([data-visible]) { opacity: 0; transform: translateY(24px); }
+@media (prefers-reduced-motion: reduce) {
+  html.js .reveal:not([data-visible]) { opacity: 1; transform: none; }
+}

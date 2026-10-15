@@ -25,6 +25,8 @@ type FieldName = keyof FormValues;
 
 const STEP_TITLES = ["Do que você precisa?", "Conte mais", "Quando?", "Onde?", "Tipo de ajuda", "Revisar", "Publicar"];
 const DRAFT_KEY = "aa:request-wizard";
+/** Marca que o visitante foi se cadastrar no meio da publicação: ao voltar, abre direto na revisão. */
+const RESUME_KEY = "aa:request-wizard-resume";
 
 const HELP_TYPES = [
   { value: "FREE", label: "Gratuita", desc: "Sem pagamento", icon: Gift },
@@ -48,12 +50,15 @@ export function RequestWizard({
   requestId,
   initialStatus,
   defaults,
+  visitor = false,
 }: {
   categories: Category[];
   initial?: Partial<FormValues>;
   requestId?: string;
   initialStatus?: "DRAFT" | "OPEN";
   defaults: { state: string; city: string; neighborhood: string };
+  /** Sem login: o pedido é preenchido normalmente; ao publicar, pedimos o cadastro. */
+  visitor?: boolean;
 }) {
   const router = useRouter();
   const { run, pending } = useRunAction();
@@ -86,8 +91,12 @@ export function RequestWizard({
         (Object.keys(parsed) as FieldName[]).forEach((k) => parsed[k] !== undefined && setValue(k, parsed[k] as never));
         if (parsed.amountCents) setAmountText(String(Number(parsed.amountCents) / 100).replace(".", ","));
       }
+      if (!visitor && localStorage.getItem(RESUME_KEY)) {
+        localStorage.removeItem(RESUME_KEY);
+        setStep(5); // voltou do cadastro: direto para a revisão
+      }
     } catch { /* ignorar */ }
-  }, [editing, setValue]);
+  }, [editing, setValue, visitor]);
 
   useEffect(() => {
     if (editing || published) return;
@@ -126,6 +135,15 @@ export function RequestWizard({
   async function onPublish() {
     const v = await validateAll();
     if (!v) return;
+    if (visitor) {
+      // O rascunho já está salvo neste aparelho; após o cadastro a pessoa volta para a revisão.
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(v));
+        localStorage.setItem(RESUME_KEY, "1");
+      } catch { /* ignorar */ }
+      router.push(`/cadastrar?next=${encodeURIComponent("/pedido/novo")}`);
+      return;
+    }
     run(() => publishRequestAction(v, requestId), {
       refresh: false,
       onSuccess: (r) => {
@@ -165,7 +183,7 @@ export function RequestWizard({
             <ArrowLeft className="size-6" aria-hidden />
           </button>
         ) : (
-          <Link href={editing ? `/pedido/${requestId}` : "/inicio"} className="grid size-11 place-items-center rounded-full hover:bg-slate-100" aria-label="Cancelar">
+          <Link href={editing ? `/pedido/${requestId}` : visitor ? "/" : "/inicio"} className="grid size-11 place-items-center rounded-full hover:bg-slate-100" aria-label="Cancelar">
             <ArrowLeft className="size-6" aria-hidden />
           </Link>
         )}
@@ -297,13 +315,18 @@ export function RequestWizard({
           {step === 5 && (
             <>
               {(!editing || initialStatus === "DRAFT") && (
-                <Button size="lg" variant="warm" loading={pending} onClick={onPublish}>Publicar pedido</Button>
+                <Button size="lg" variant="warm" loading={pending} onClick={onPublish}>{visitor ? "Publicar pedido (criar conta)" : "Publicar pedido"}</Button>
               )}
               {editing && initialStatus === "OPEN" && (
                 <Button size="lg" loading={pending} onClick={onSave}>Salvar alterações</Button>
               )}
-              {(!editing || initialStatus === "DRAFT") && (
+              {!visitor && (!editing || initialStatus === "DRAFT") && (
                 <Button size="lg" variant="secondary" loading={pending} onClick={onSave}>Salvar como rascunho</Button>
+              )}
+              {visitor && (
+                <p className="text-center text-sm text-ink-muted">
+                  Para publicar, você cria sua conta grátis em menos de 1 minuto. Seu pedido fica salvo e você volta direto para cá.
+                </p>
               )}
             </>
           )}

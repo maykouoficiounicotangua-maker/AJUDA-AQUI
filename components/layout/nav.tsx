@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Compass, FileText, HandHeart, Home, MessageCircle, PlusCircle, User } from "lucide-react";
+import { Bell, Compass, FileText, HandHeart, Home, LogIn, MessageCircle, PlusCircle, ShieldCheck, User } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const items = [
@@ -98,11 +98,51 @@ export function SideNav({ unreadMessages, isAdmin }: { unreadMessages: number; i
       {isAdmin && (
         <Link
           href="/admin"
-          className="mt-auto flex min-h-12 items-center gap-3 rounded-2xl px-4 font-semibold text-ink-muted hover:bg-slate-100"
+          className="mt-auto flex min-h-12 items-center gap-3 rounded-2xl bg-brand-50 px-4 font-semibold text-brand-800 hover:bg-brand-100"
         >
-          Painel administrativo
+          <ShieldCheck className="size-5" aria-hidden /> Painel do administrador
         </Link>
       )}
+    </nav>
+  );
+}
+
+const visitorItems = [
+  { href: "/", label: "Início", icon: Home },
+  { href: "/explorar", label: "Ver pedidos", icon: Compass },
+  { href: "/pedido/novo", label: "Pedir ajuda", icon: PlusCircle, primary: true },
+  { href: "/seguranca", label: "Segurança", icon: ShieldCheck },
+  { href: "/entrar", label: "Entrar", icon: LogIn },
+];
+
+/** Navegação inferior para visitantes (sem login). */
+export function VisitorBottomNav() {
+  const pathname = usePathname();
+  return (
+    <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <ul className="mx-auto grid max-w-lg grid-cols-5">
+        {visitorItems.map(({ href, label, icon: Icon, primary }) => {
+          const active = href === "/" ? pathname === "/" : isActive(pathname, href);
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={cn("flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-semibold", active ? "text-brand-700" : "text-ink-muted")}
+              >
+                {primary ? (
+                  <span className="-mt-6 grid size-14 place-items-center rounded-full bg-warm-700 text-white shadow-lg">
+                    <Icon className="size-7" aria-hidden />
+                  </span>
+                ) : (
+                  <Icon className={cn("size-6", active && "stroke-[2.5]")} aria-hidden />
+                )}
+                <span>{label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

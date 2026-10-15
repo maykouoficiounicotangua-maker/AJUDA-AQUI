@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { Toaster } from "sonner";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { publicEnv } from "@/lib/env";
 import "./globals.css";
 
@@ -17,7 +18,8 @@ export const metadata: Metadata = {
   applicationName: "Ajuda Aqui",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Ajuda Aqui", statusBarStyle: "default" },
-  icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
+  formatDetection: { telephone: false },
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
   openGraph: {
     title: "AJUDA AQUI — Pessoas ajudando pessoas.",
     description: "Peça ou ofereça pequenas ajudas perto de você.",
@@ -30,12 +32,17 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover", // usa a área toda em iPhones com notch (respeitamos safe-area nos componentes)
   themeColor: "#0f766e",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        {/* marca que há JS antes da pintura: animações de entrada só se aplicam com JS */}
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <a
           href="#conteudo"
@@ -44,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Pular para o conteúdo
         </a>
         {children}
+        <InstallPrompt />
         <Toaster position="top-center" richColors closeButton />
       </body>
     </html>

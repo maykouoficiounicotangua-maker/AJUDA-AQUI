@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth/session";
 export const metadata: Metadata = { title: { default: "Administração", template: "%s · Admin" }, robots: { index: false, follow: false } };
 
 const links = [
-  { href: "/admin", label: "Resumo" },
+  { href: "/admin", label: "Painel" },
   { href: "/admin/usuarios", label: "Usuários" },
   { href: "/admin/pedidos", label: "Pedidos" },
   { href: "/admin/denuncias", label: "Denúncias" },

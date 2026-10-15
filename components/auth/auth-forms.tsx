@@ -68,7 +68,7 @@ export function SignInForm({ next }: { next?: string }) {
   );
 }
 
-export function SignUpForm() {
+export function SignUpForm({ next }: { next?: string }) {
   const form = useTypedForm<z.input<typeof signUpSchema>>(signUpSchema, {
     fullName: "", email: "", phone: "", password: "", state: "", city: "", neighborhood: "",
   });
@@ -82,7 +82,7 @@ export function SignUpForm() {
     );
   }
   return (
-    <form method="post" onSubmit={submit(signUpAction)} className="space-y-4" noValidate>
+    <form method="post" onSubmit={submit((v) => signUpAction(v, next))} className="space-y-4" noValidate>
       <Field label="Nome completo" error={errors.fullName?.message} required>
         {(a) => <Input {...a} autoComplete="name" {...register("fullName")} />}
       </Field>

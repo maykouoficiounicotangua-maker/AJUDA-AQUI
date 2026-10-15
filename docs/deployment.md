@@ -34,8 +34,13 @@ O link padrão (PKCE) só funciona no MESMO navegador em que a pessoa se cadastr
 
 Traduza assunto e corpo para português.
 
-### Primeiro administrador
-No SQL Editor: `update public.profiles set role = 'ADMIN' where id = (select id from auth.users where email = 'seu@email');`
+### Administradores
+A lista fica no banco (nunca no código). Para adicionar alguém (já cadastrado ou que vai se cadastrar):
+```sql
+insert into public.admin_allowlist (email) values ('pessoa@email.com') on conflict do nothing;
+update public.profiles set role = 'ADMIN' where id in (select id from auth.users where lower(email) = 'pessoa@email.com');
+```
+Para remover: apague da lista e volte o `role` para `USER`.
 
 ## 3. Jobs (vercel.json)
 `/api/cron/expire` (diário): expira pedidos vencidos, envia lembretes "ajuda próxima" e entrega pushes pendentes. `/api/push/dispatch` (diário, fallback). Pushes de eventos são entregues na hora, após cada ação. No plano Pro, aumente a frequência (ex.: a cada hora).

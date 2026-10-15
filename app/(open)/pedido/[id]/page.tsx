@@ -12,7 +12,12 @@ import { OfferForm, MyOfferNotice } from "@/components/offers/offer-form";
 import { OffersPanel, type OfferItem } from "@/components/offers/offers-panel";
 import { ProfileMini } from "@/components/profile/profile-mini";
 import { ReviewForm } from "@/components/reviews/review-form";
-import { getSupabase, requireUser } from "@/lib/auth/session";
+import { getAuthUser, getSupabase } from "@/lib/auth/session";
+import { publicRequest } from "@/services/public";
+import { VisitorRequestView } from "@/components/requests/visitor-request-view";
+import { RequestTimeline } from "@/components/requests/request-timeline";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { availableActions, STATUS_LABELS, STATUS_TONE, viewerRole } from "@/lib/requests/state-machine";
 import { formatApproxDistance, haversineKm } from "@/lib/geo/distance";
 import { toMatchRequest } from "@/lib/matching/mappers";
@@ -34,8 +39,18 @@ export async function generateMetadata({ params }: PageProps<"/pedido/[id]">): P
 
 export default async function RequestDetailPage({ params }: PageProps<"/pedido/[id]">) {
   const { id } = await params;
-  const { userId } = await requireUser();
+  if (!UUID.test(id)) notFound();
+  const user = await getAuthUser();
   const db = await getSupabase();
+
+  // ---------- VISITANTE: vê o pedido com dados mínimos; login só ao querer ajudar ----------
+  if (!user) {
+    const pub = await publicRequest(db, id);
+    if (!pub) notFound();
+    const categories = await listCategories(db);
+    return <VisitorRequestView request={pub} category={categories.find((c) => c.id === pub.category_id)} />;
+  }
+  const userId = user.id;
 
   const request = await getRequest(db, id);
   if (!request) notFound(); // não existe OU a RLS não permite ver (mesma resposta)
@@ -115,6 +130,8 @@ export default async function RequestDetailPage({ params }: PageProps<"/pedido/[
           {request.help_type === "EXCHANGE" && <li className="flex items-center gap-2 sm:col-span-2"><Wallet className="size-5" aria-hidden /> Troca: {request.exchange_description}</li>}
         </ul>
       </Card>
+
+      <RequestTimeline status={request.status} />
 
       {requester && !isOwner && (
         <Card>

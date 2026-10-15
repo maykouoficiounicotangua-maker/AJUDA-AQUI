@@ -34,6 +34,12 @@ UI (app/, components/)  →  Server Actions / Route Handlers  →  services/  �
 | 21 | E2E autoprovisionado (`tests/e2e/support/live.ts`) | Roda contra o Supabase real/produção sem seed e sem enviar e-mails; limpa tudo ao final |
 | 22 | Fan-out de matching em `after()` | Publicar responde rápido; só a contagem é calculada antes |
 | 23 | `/auth/confirm` (token_hash) além de `/auth/callback` (PKCE) | Confirmação de e-mail funciona em outro aparelho |
+| 24 | Visitante navega sem login: grupo de rotas `(open)` + funções `public_feed`/`public_request` (SECURITY DEFINER, dados mínimos) | Reduz atrito; tabelas continuam fechadas para anon |
+| 25 | Criar pedido sem login: rascunho no aparelho, cadastro só ao publicar, volta direto à revisão | Conversão |
+| 26 | Convite de instalação (`beforeinstallprompt`/iOS) antes do convite de notificações; nunca os dois juntos | UX de app nativo |
+| 27 | Alcance dos avisos por pessoa (`match_scope`: COMPATIBLE/NEARBY); candidatos selecionados em SQL (`helper_candidates`) | Escala nacional e escolha do usuário |
+| 28 | Admins por lista de e-mails no banco (`admin_allowlist`), nunca no código | Privacidade; sobrevive à recriação da conta |
+| 29 | SW com página offline e sem cache de páginas com dados | PWA completo sem vazar dados privados |
 | 19 | Coordenada pública = centróide da cidade (`lib/geo/locations.ts`) | Sem API externa de geocoding; privacidade por construção. Substituir por tabela IBGE para cobertura nacional completa |
 
 ## Máquina de estados do pedido
@@ -47,4 +53,5 @@ Atualize esta seção a cada fase concluída.
 - Fases 1–19 e 21–23: implementadas (docs, design system, migrations+RLS, auth/consent/onboarding, categorias, pedidos+wizard, explorar, propostas, matching, seleção/confirmação, chat realtime, conclusão/disputa, avaliações/reputação, notificações+push VAPID, bloqueio/denúncia, admin+auditoria, analytics, PWA, segurança, deploy).
 - Fase 20 (E2E): específicos públicos rodam; fluxos completos escritos e protegidos por `E2E_FULL=1` (exigem Supabase real).
 - 2026-10-15: verificação contra produção (fluxos completos passando com Supabase real); correções e melhorias listadas no commit.
+- 2026-10-15 (2): navegação sem login, landing animada, instalação + notificações guiadas, push verificado em Chrome real (FCM), admin com métricas.
 - **Pendências conhecidas**: (a) rodar E2E completo contra Supabase real; (b) validar entrega de push em navegador real com chaves VAPID; (c) tabela IBGE de municípios/centróides; (d) prompt de Push chegou truncado na seção 23 — integração matching→push implementada em `lib/notifications/match-fanout.ts`.

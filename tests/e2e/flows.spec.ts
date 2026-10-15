@@ -150,7 +150,7 @@ test.describe("fluxo principal: Maria pede, João ajuda", () => {
   test("João recebe a notificação de pedido compatível, vê o pedido e envia proposta", async ({ browser }) => {
     const { context, page } = await session(browser, joao);
     await page.goto("/notificacoes");
-    await expect(page.getByText("Nova oportunidade de ajuda").first()).toBeVisible();
+    await expect(page.getByText(/Pedido que combina com você|Novo pedido de ajuda perto de você/).first()).toBeVisible();
 
     await page.goto("/explorar?estado=all");
     await page.getByLabel("Buscar pedidos").fill(title);
@@ -305,7 +305,8 @@ test.describe("admin", () => {
   test("indicadores; suspender e reativar usuário com auditoria", async ({ browser }) => {
     const a = await session(browser, admin);
     await a.page.goto("/admin");
-    await expect(a.page.getByText("Usuários ativos")).toBeVisible();
+    await expect(a.page.getByRole("heading", { name: "Painel do administrador" })).toBeVisible();
+    await expect(a.page.getByText("Quem mais ajuda")).toBeVisible(); // exige a migration 0009 aplicada
     await a.page.goto(`/admin/usuarios?q=${encodeURIComponent("Carlos Teste")}`);
     const row = a.page.locator("li", { hasText: "Carlos Teste" });
     await row.getByRole("button", { name: "Suspender" }).click();

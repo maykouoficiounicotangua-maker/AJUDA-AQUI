@@ -100,3 +100,23 @@ export async function setCategoryActiveAction(id: string, active: boolean): Prom
     return toAction("admin.categoryActive", r, active ? "Categoria ativada." : "Categoria desativada.");
   });
 }
+
+const broadcastSchema = z.object({
+  title: z.string().trim().min(3, "Título muito curto").max(120),
+  body: z.string().trim().min(5, "Mensagem muito curta").max(300),
+  url: z.string().trim().max(200).refine((u) => !u || (u.startsWith("/") && !u.startsWith("//")), "Use um caminho interno, ex.: /explorar").optional(),
+  state: z.string().max(2).optional(),
+});
+
+/** Aviso geral (notificação interna + push) para todos os usuários ativos, ou de um estado. */
+export async function broadcastAction(input: unknown): Promise<ActionResult<{ recipients: number }>> {
+  return withAdmin("admin.broadcast", async (db) => {
+    const p = parseInput(broadcastSchema, input);
+    if (!p.ok) return p.result;
+    const r = await admin.broadcast(db, p.data.title, p.data.body, p.data.url, p.data.state);
+    if (!r.ok) return toAction("admin.broadcast", r);
+    schedulePushDispatch();
+    revalidatePath("/admin/auditoria");
+    return { ok: true, data: { recipients: r.data }, message: `Aviso enviado para ${r.data} ${r.data === 1 ? "pessoa" : "pessoas"}.` };
+  });
+}

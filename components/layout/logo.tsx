@@ -9,7 +9,7 @@ export function Logo({ className, href = "/", tagline = false }: { className?: s
         <HandHeart className="size-6" aria-hidden />
       </span>
       <span className="leading-tight">
-        <span className="block text-lg font-extrabold tracking-tight">Ajuda Aqui</span>
+        <span className="block text-lg font-extrabold tracking-tight whitespace-nowrap">Ajuda Aqui</span>
         {tagline && <span className="block text-xs text-ink-muted">Pessoas ajudando pessoas.</span>}
       </span>
     </Link>

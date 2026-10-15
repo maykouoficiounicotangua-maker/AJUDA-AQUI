@@ -158,6 +158,7 @@ export const notificationPrefsSchema = z.object({
   pref_requests: z.boolean(),
   pref_reviews: z.boolean(),
   pref_system: z.boolean(),
+  match_scope: z.enum(["COMPATIBLE", "NEARBY"]),
 }).partial();
 
 export const pushSubscriptionSchema = z.object({

@@ -7,16 +7,20 @@ import { NotificationBell } from "@/components/notifications/realtime-notificati
 import { signOutAction } from "@/app/actions/auth";
 import { isAdminProfile } from "@/lib/auth/session";
 import type { Profile } from "@/types";
+import type { NotificationPrefs } from "@/services/notifications";
+import { NotificationSetup } from "@/components/pwa/notification-setup";
 
 export function AppShell({
   profile,
   unreadNotifications,
   unreadMessages,
+  prefs,
   children,
 }: {
   profile: Profile;
   unreadNotifications: number;
   unreadMessages: number;
+  prefs: NotificationPrefs;
   children: React.ReactNode;
 }) {
   const admin = isAdminProfile(profile);
@@ -46,6 +50,11 @@ export function AppShell({
             <Link href="/perfil" aria-label="Meu perfil" className="rounded-full">
               <Avatar name={profile.full_name} src={profile.avatar_url} size={40} />
             </Link>
+            {admin && (
+              <Link href="/admin" aria-label="Painel do administrador" className="grid size-11 place-items-center rounded-full text-brand-700 hover:bg-slate-100 lg:hidden">
+                <ShieldAlert className="size-6" aria-hidden />
+              </Link>
+            )}
             <Link href="/configuracoes" aria-label="Configurações" className="grid size-11 place-items-center rounded-full text-ink-muted hover:bg-slate-100 lg:hidden">
               <Settings className="size-6" aria-hidden />
             </Link>
@@ -67,6 +76,7 @@ export function AppShell({
         </main>
       </div>
       <BottomNav unreadMessages={unreadMessages} />
+      <NotificationSetup initial={prefs} />
     </div>
   );
 }

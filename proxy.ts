@@ -4,7 +4,7 @@ import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 
 /** Rotas que exigem login. A autorização real continua no banco (RLS) e nas actions. */
 const PRIVATE_PREFIXES = [
-  "/inicio", "/explorar", "/pedido", "/meus-pedidos", "/minhas-ajudas", "/mensagens", "/conversa",
+  "/inicio", "/meus-pedidos", "/minhas-ajudas", "/mensagens", "/conversa",
   "/perfil", "/usuario", "/notificacoes", "/configuracoes", "/favoritos", "/admin", "/boas-vindas", "/aceitar-termos",
 ];
 const AUTH_PAGES = ["/entrar", "/cadastrar", "/recuperar-senha"];
@@ -12,6 +12,9 @@ const AUTH_PAGES = ["/entrar", "/cadastrar", "/recuperar-senha"];
 function matches(path: string, prefixes: string[]) {
   return prefixes.some((p) => path === p || path.startsWith(p + "/"));
 }
+
+/** Explorar, detalhe e criação de pedido são abertos a visitantes; editar um pedido não. */
+const isPrivate = (path: string) => matches(path, PRIVATE_PREFIXES) || /^\/pedido\/[^/]+\/editar\/?$/.test(path);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -37,7 +40,7 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
   const user = data.user;
 
-  if (!user && matches(pathname, PRIVATE_PREFIXES)) {
+  if (!user && isPrivate(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/entrar";
     url.search = "";
@@ -48,10 +51,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && matches(pathname, AUTH_PAGES)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/inicio";
-    url.search = "";
-    return NextResponse.redirect(url);
+    // já logado: segue para onde ia (somente caminhos internos) ou para o início
+    const next = request.nextUrl.searchParams.get("next") ?? "";
+    const safe = next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/inicio";
+    return NextResponse.redirect(new URL(safe, request.url));
   }
 
   return response;

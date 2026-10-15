@@ -20,7 +20,9 @@ E2E_FULL=1 E2E_BASE_URL=https://ajuda-aqui.vercel.app npx playwright test tests/
 # contra build local usando o .env.local
 E2E_FULL=1 npx playwright test tests/e2e/flows.spec.ts --workers=1
 ```
-`scripts/visual-audit.mts` captura as telas logadas e roda o axe (WCAG 2 AA).
+`scripts/visual-audit.mts` captura telas de visitante, usuário e admin e roda o axe (WCAG 2 AA).
+`scripts/push-e2e.mts` verifica o Web Push de ponta a ponta num Chrome REAL (assinatura FCM → envio VAPID → Service Worker, com app aberto e fechado): `npx tsx scripts/push-e2e.mts http://localhost:3100 chrome`.
+`scripts/pwa-screenshots.mts` regenera as capturas do diálogo de instalação.
 O servidor é iniciado pelo próprio Playwright (`next build && next start` na porta 3100).
 
 ## O que NÃO é coberto automaticamente (limites conhecidos)

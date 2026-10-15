@@ -18,7 +18,7 @@ create schema auth;
 create table auth.users (
   instance_id uuid,
   id uuid primary key default gen_random_uuid(),
-  aud text, role text, email text,
+  aud text, role text, email text, last_sign_in_at timestamptz,
   encrypted_password text, email_confirmed_at timestamptz,
   raw_app_meta_data jsonb default '{}'::jsonb,
   raw_user_meta_data jsonb default '{}'::jsonb,

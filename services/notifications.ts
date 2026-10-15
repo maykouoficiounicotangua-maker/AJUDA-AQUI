@@ -49,18 +49,20 @@ export interface NotificationPrefs {
   pref_requests: boolean;
   pref_reviews: boolean;
   pref_system: boolean;
+  /** COMPATIBLE: só pedidos que combinam comigo · NEARBY: qualquer pedido perto de mim */
+  match_scope: "COMPATIBLE" | "NEARBY";
 }
 
 export async function getPrefs(db: Db, userId: string): Promise<NotificationPrefs> {
   const { data } = await db
     .from("notification_preferences")
-    .select("in_app_enabled, push_enabled, pref_matches, pref_messages, pref_offers, pref_requests, pref_reviews, pref_system")
+    .select("in_app_enabled, push_enabled, pref_matches, pref_messages, pref_offers, pref_requests, pref_reviews, pref_system, match_scope")
     .eq("user_id", userId)
     .maybeSingle();
   return (
     (data as NotificationPrefs | null) ?? {
       in_app_enabled: true, push_enabled: true, pref_matches: true, pref_messages: true,
-      pref_offers: true, pref_requests: true, pref_reviews: true, pref_system: true,
+      pref_offers: true, pref_requests: true, pref_reviews: true, pref_system: true, match_scope: "COMPATIBLE",
     }
   );
 }

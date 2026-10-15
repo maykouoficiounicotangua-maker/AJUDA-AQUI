@@ -3,11 +3,11 @@ import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { serverEnv } from "@/lib/env";
 import { logServerError } from "@/lib/errors";
-import { findCompatibleHelpers } from "@/services/matching";
+import { findHelpersToNotify } from "@/services/matching";
 import { getRequest } from "@/services/requests";
 import { createInAppNotification, dispatchNow } from "./service";
 
-const MAX_NOTIFIED = 20;
+const MAX_NOTIFIED = 100;
 
 /**
  * Quando um pedido é publicado: encontra ajudantes compatíveis (motor de matching) e os avisa.
@@ -22,7 +22,7 @@ export async function notifyCompatibleHelpers(requestId: string, categoryName: s
     const request = await getRequest(admin, requestId);
     if (!request || request.status !== "OPEN") return 0;
 
-    const compatible = await findCompatibleHelpers(admin, request, 55);
+    const compatible = await findHelpersToNotify(admin, request, 55);
     const where = [request.city, request.neighborhood].filter(Boolean).join(" · ");
     const targets = compatible.slice(0, MAX_NOTIFIED);
 
@@ -32,7 +32,7 @@ export async function notifyCompatibleHelpers(requestId: string, categoryName: s
           await createInAppNotification(admin, {
             userId: helper.userId,
             type: "NEW_MATCH",
-            title: "Nova oportunidade de ajuda",
+            title: helper.score >= 75 ? "Pedido que combina com você" : "Novo pedido de ajuda perto de você",
             body: `${categoryName} perto de você — ${where}.`,
             url: `/pedido/${request.id}`,
             data: { request_id: request.id },

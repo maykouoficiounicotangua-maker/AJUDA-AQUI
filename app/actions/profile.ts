@@ -9,7 +9,7 @@ import { publicEnv } from "@/lib/env";
 import * as helper from "@/services/helper";
 import * as notifications from "@/services/notifications";
 import { markAllRead, markRead } from "@/services/notifications";
-import { getProfile } from "@/services/profiles";
+import { getHelperPrefs, getProfile } from "@/services/profiles";
 import type { ActionResult } from "@/types";
 
 export async function updateProfileAction(input: unknown): Promise<ActionResult> {
@@ -74,6 +74,35 @@ export async function updateNotificationPrefsAction(input: unknown): Promise<Act
     const r = await notifications.updatePrefs(db, userId, p.data);
     if (r.ok) revalidatePath("/configuracoes");
     return toAction("notifications.prefs", r);
+  });
+}
+
+/**
+ * Configuração de notificações (tela de boas-vindas ao app instalado): grava as escolhas e,
+ * se a pessoa quer avisos de novos pedidos, garante que ela tenha uma área de ajuda (cidade do perfil).
+ */
+export async function setupNotificationsAction(input: unknown): Promise<ActionResult> {
+  return withUser("notifications.setup", async ({ db, userId }) => {
+    const p = parseInput(notificationPrefsSchema, input);
+    if (!p.ok) return p.result;
+    const r = await notifications.updatePrefs(db, userId, { ...p.data, in_app_enabled: true });
+    if (!r.ok) return toAction("notifications.setup", r);
+    if (p.data.pref_matches) {
+      const existing = await getHelperPrefs(db, userId);
+      if (!existing) {
+        const profile = await getProfile(db, userId);
+        const created = await helper.saveHelperPrefs(
+          db, userId,
+          { state: profile?.state ?? null, city: profile?.city ?? null, neighborhood: profile?.neighborhood ?? null },
+          { description: undefined, maxDistanceKm: 15, acceptsPaid: true, acceptsFree: true, acceptsExchange: true, availableDays: [0, 1, 2, 3, 4, 5, 6], availabilityStart: "07:00", availabilityEnd: "22:00", active: true },
+        );
+        if (!created.ok) return toAction("notifications.setup", created);
+      } else if (!existing.active) {
+        await db.from("helper_preferences").update({ active: true }).eq("user_id", userId);
+      }
+    }
+    revalidatePath("/configuracoes");
+    return { ok: true };
   });
 }
 

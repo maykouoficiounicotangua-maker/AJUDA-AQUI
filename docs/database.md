@@ -10,6 +10,8 @@ PostgreSQL via Supabase. Toda mudança estrutural é uma **migration** em `supab
 | `…0004_functions.sql` | RPCs transacionais, `search_requests`, máquina de estados, expiração, funções admin, `profile_stats`, fila de push, exclusão de conta, **grants de execução** |
 | `…0005_rls.sql` | RLS em todas as tabelas + grants por coluna + Realtime |
 | `…0007_improvements.sql` | feed sem pedidos vencidos, proposta bloqueada em pedido vencido, filtros cidade/bairro sem diferenciar maiúsculas, lembretes `send_upcoming_reminders` (+ `REQUEST_REMINDER`), permissões |
+| `…0008_public_browsing.sql` | `public_feed`/`public_request` para visitantes, `match_scope`, `helper_candidates`, aviso de mensagem agrupado por conversa |
+| `…0009_admin.sql` | `admin_allowlist` (+ gatilho), `admin_metrics`, `admin_user_overview`, `admin_broadcast` |
 | `…0006_storage.sql` | buckets `avatars` (público) e `evidence` (privado) — só em projetos Supabase |
 
 ## Desvios intencionais do prompt mestre (e por quê)

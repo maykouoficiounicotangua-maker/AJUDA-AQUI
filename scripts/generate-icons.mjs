@@ -20,6 +20,7 @@ const jobs = [
   ["icon-512.png", 512, 0.82],
   ["icon-maskable-512.png", 512, 0.6], // área segura maior para máscaras
   ["badge-72.png", 72, 0.8],
+  ["apple-touch-icon.png", 180, 0.78],
 ];
 for (const [name, size, pad] of jobs) {
   await sharp(Buffer.from(glyph(size, pad))).png().toFile(`public/icons/${name}`);

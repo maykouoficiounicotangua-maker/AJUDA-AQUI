@@ -4,7 +4,7 @@ import { ArrowRight, Compass, Sparkles } from "lucide-react";
 import { Card, EmptyState } from "@/components/ui/display";
 import { LinkButton } from "@/components/ui/button";
 import { RequestCard } from "@/components/requests/request-card";
-import { PushPrompt } from "@/components/notifications/push-prompt";
+import { DraftBanner } from "@/components/requests/draft-banner";
 import { getSupabase, requireUser } from "@/lib/auth/session";
 import { firstName } from "@/lib/utils/format";
 import { listCategories } from "@/services/categories";
@@ -40,7 +40,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <PushPrompt />
+      <DraftBanner />
 
       {!hasHistory && (
         <Card className="border-brand-200 bg-brand-50">
